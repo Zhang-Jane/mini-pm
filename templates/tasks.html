@@ -1,0 +1,1006 @@
+{% extends "base.html" %}
+
+{% block title %}任务管理 - Mini PM2{% endblock %}
+{% block page_title %}任务管理{% endblock %}
+
+{% block content %}
+<div class="page-content">
+  <!-- 顶部工具栏 -->
+  <div class="bg-white rounded-lg shadow-sm mb-6">
+    <div class="p-4 md:p-6 border-b border-gray-200">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div class="flex items-center gap-4">
+          <h3 class="text-lg font-semibold text-gray-800">任务列表</h3>
+          <span id="task-count" class="px-2 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">0 个任务</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <!-- 搜索框 -->
+          <div class="relative">
+            <input type="text" id="search-input" placeholder="搜索任务..."
+              class="w-64 px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+            <svg class="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor"
+              viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </div>
+          <!-- 状态筛选 -->
+          <select id="status-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+            <option value="">全部状态</option>
+            <option value="enabled">运行中</option>
+            <option value="disabled">已停止</option>
+          </select>
+          <!-- 添加任务按钮 -->
+          <button id="add-task-btn"
+            class="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600 transition-colors">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6">
+              </path>
+            </svg>
+            添加任务
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 任务列表 -->
+  <div class="bg-white rounded-lg shadow-sm">
+    <!-- 批量操作工具栏 -->
+    <div id="batch-toolbar" class="hidden px-4 py-3 bg-blue-50 border-b border-blue-200">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <span class="text-sm text-blue-700">
+            已选择 <span id="selected-count">0</span> 个任务
+          </span>
+          <button id="select-all" class="text-sm text-blue-600 hover:text-blue-800 underline">
+            全选
+          </button>
+          <button id="clear-selection" class="text-sm text-gray-600 hover:text-gray-800 underline">
+            取消选择
+          </button>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="batch-enable" class="px-3 py-1 text-sm bg-green-100 text-green-800 rounded hover:bg-green-200">
+            批量启用
+          </button>
+          <button id="batch-disable" class="px-3 py-1 text-sm bg-yellow-100 text-yellow-800 rounded hover:bg-yellow-200">
+            批量禁用
+          </button>
+          <button id="batch-run" class="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded hover:bg-blue-200">
+            批量运行
+          </button>
+          <button id="batch-delete" class="px-3 py-1 text-sm bg-red-100 text-red-800 rounded hover:bg-red-200">
+            批量删除
+          </button>
+          <button id="batch-clear-history" class="px-3 py-1 text-sm bg-gray-100 text-gray-800 rounded hover:bg-gray-200">
+            清空历史
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="table-container table-responsive">
+      <table class="w-full min-w-full">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <input type="checkbox" id="select-all-checkbox" class="rounded border-gray-300 text-primary focus:ring-primary">
+            </th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">任务ID</th>
+            <th
+              class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
+              脚本路径</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">间隔(分钟)</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+          </tr>
+        </thead>
+        <tbody id="tasks-table" class="bg-white divide-y divide-gray-200">
+          <!-- 任务列表将通过 JavaScript 动态加载 -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 分页控件 -->
+    <div class="px-4 py-3 border-t border-gray-200 bg-gray-50">
+      <div class="flex items-center justify-between">
+        <div class="text-sm text-gray-700">
+          显示 <span id="start-item">1</span> 到 <span id="end-item">10</span> 条，共 <span id="total-items">0</span> 条
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="prev-page"
+            class="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+            上一页
+          </button>
+          <span id="page-info" class="px-3 py-1 text-sm text-gray-700">第 1 页</span>
+          <button id="next-page"
+            class="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+            下一页
+          </button>
+        </div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+<!-- 添加任务弹窗 -->
+<div id="add-task-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+  <div class="flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+    <div class="p-6 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+      <h3 class="text-lg font-semibold text-gray-800">添加新任务</h3>
+          <button id="close-modal" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+    </div>
+      <form id="add-task-form">
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">任务ID</label>
+            <input type="text" name="id" required
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="例如: backup_task">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">脚本路径</label>
+            <input type="text" name="script_path" required
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="例如: /path/to/script.py">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">执行间隔(分钟)</label>
+            <input type="number" name="interval_minutes" required min="1" value="60"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">解释器路径</label>
+            <input type="text" name="execute_path"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="例如: /usr/bin/python3">
+          </div>
+
+          <div class="flex items-center">
+            <input type="checkbox" name="enabled" checked
+              class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded">
+            <label class="ml-2 block text-sm text-gray-700">启用任务</label>
+          </div>
+        </div>
+        <div class="p-6 border-t border-gray-200 flex justify-end gap-3">
+          <button type="button" id="cancel-add"
+            class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+            取消
+          </button>
+          <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600 transition-colors">
+            添加任务
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑任务弹窗 -->
+<div id="edit-task-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+  <div class="flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+      <div class="p-6 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold text-gray-800">编辑任务</h3>
+          <button id="close-edit-modal" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <form id="edit-task-form">
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">任务ID</label>
+            <input type="text" name="edit_id" required readonly
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-primary focus:border-transparent">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">脚本路径</label>
+            <input type="text" name="edit_script_path" required
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="例如: /path/to/script.py">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">执行间隔(分钟)</label>
+            <input type="number" name="edit_interval_minutes" required min="1"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">解释器路径</label>
+            <input type="text" name="edit_execute_path"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="例如: /usr/bin/python3">
+          </div>
+
+          <div class="flex items-center">
+            <input type="checkbox" name="edit_enabled"
+              class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded">
+            <label class="ml-2 block text-sm text-gray-700">启用任务</label>
+          </div>
+        </div>
+        <div class="p-6 border-t border-gray-200 flex justify-end gap-3">
+          <button type="button" id="cancel-edit"
+            class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+            取消
+          </button>
+          <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600 transition-colors">
+            保存修改
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 确认删除弹窗 -->
+<div id="delete-confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+  <div class="flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+      <div class="p-6 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-800">确认删除</h3>
+      </div>
+      <div class="p-6">
+        <p class="text-gray-700">确定要删除任务 "<span id="delete-task-name"></span>" 吗？此操作不可撤销。</p>
+      </div>
+      <div class="p-6 border-t border-gray-200 flex justify-end gap-3">
+        <button id="cancel-delete"
+          class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+          取消
+        </button>
+        <button id="confirm-delete"
+          class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+          确认删除
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 全局变量
+  let currentPage = 1;
+  let pageSize = 10;
+  let allTasks = [];
+  let filteredTasks = [];
+  let taskToDelete = null;
+  let taskToEdit = null;
+
+  // 初始化
+  document.addEventListener('DOMContentLoaded', function () {
+    loadTasks();
+    setupEventListeners();
+    
+    // 监听存储配置变化
+    checkStorageConfigChange();
+  });
+  
+  // 检查存储配置变化
+  function checkStorageConfigChange() {
+    // 每30秒检查一次存储配置
+    setInterval(async function() {
+      try {
+        const response = await fetch('/api/settings/storage-info');
+        if (response.ok) {
+          const storageInfo = await response.json();
+          const currentStorageType = storageInfo.storage_config.type;
+          
+          // 如果存储类型发生变化，重新加载任务
+          const lastStorageType = localStorage.getItem('last-storage-type');
+          if (lastStorageType && lastStorageType !== currentStorageType) {
+            console.log('存储类型发生变化，重新加载任务');
+            loadTasks();
+          }
+          
+          localStorage.setItem('last-storage-type', currentStorageType);
+        }
+      } catch (error) {
+        console.error('检查存储配置失败:', error);
+      }
+    }, 30000);
+  }
+
+  // 设置事件监听器
+  function setupEventListeners() {
+    // 搜索功能
+    document.getElementById('search-input').addEventListener('input', function (e) {
+      filterTasks();
+    });
+
+    // 状态筛选
+    document.getElementById('status-filter').addEventListener('change', function (e) {
+      filterTasks();
+    });
+
+    // 分页按钮
+    document.getElementById('prev-page').addEventListener('click', function () {
+      if (currentPage > 1) {
+        currentPage--;
+        renderTasks();
+      }
+    });
+
+    document.getElementById('next-page').addEventListener('click', function () {
+      const maxPage = Math.ceil(filteredTasks.length / pageSize);
+      if (currentPage < maxPage) {
+        currentPage++;
+        renderTasks();
+      }
+    });
+
+    // 添加任务弹窗
+    document.getElementById('add-task-btn').addEventListener('click', function () {
+      showAddTaskModal();
+    });
+
+    document.getElementById('close-modal').addEventListener('click', function () {
+      hideAddTaskModal();
+    });
+
+    document.getElementById('cancel-add').addEventListener('click', function () {
+      hideAddTaskModal();
+    });
+
+    // 添加任务表单
+    document.getElementById('add-task-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      addTask();
+    });
+
+    // 删除确认弹窗
+    document.getElementById('cancel-delete').addEventListener('click', function () {
+      hideDeleteConfirmModal();
+    });
+
+    document.getElementById('confirm-delete').addEventListener('click', function () {
+      if (taskToDelete) {
+        deleteTask(taskToDelete);
+      }
+    });
+
+    // 编辑任务弹窗
+    document.getElementById('close-edit-modal').addEventListener('click', function () {
+      hideEditTaskModal();
+    });
+
+    document.getElementById('cancel-edit').addEventListener('click', function () {
+      hideEditTaskModal();
+    });
+
+    // 编辑任务表单
+    document.getElementById('edit-task-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      updateTask();
+    });
+  }
+
+  // 加载任务列表
+  async function loadTasks() {
+    try {
+      const response = await fetch('/api/tasks');
+      if (response.ok) {
+        allTasks = await response.json();
+        filteredTasks = [...allTasks];
+        currentPage = 1;
+        renderTasks();
+        updateTaskCount();
+      } else {
+        const errorText = await response.text();
+        console.error('Failed to load tasks:', response.status, errorText);
+        showToast(`加载任务列表失败: ${response.status}`, 'error');
+      }
+    } catch (error) {
+      console.error('Error loading tasks:', error);
+      showToast('加载任务列表失败: 网络错误', 'error');
+    }
+  }
+
+  // 过滤任务
+  function filterTasks() {
+    const searchTerm = document.getElementById('search-input').value;
+    const statusFilter = document.getElementById('status-filter').value;
+
+    let filtered = [...allTasks];
+
+    // 搜索过滤
+    if (searchTerm.trim()) {
+      filtered = filtered.filter(task =>
+        task.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        task.script_path.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // 状态过滤 - 使用enabled字段，与后端保持一致
+    if (statusFilter) {
+      if (statusFilter === 'enabled') {
+        filtered = filtered.filter(task => task.enabled === true);
+      } else if (statusFilter === 'disabled') {
+        filtered = filtered.filter(task => task.enabled === false);
+      }
+    }
+
+    filteredTasks = filtered;
+    currentPage = 1;
+    renderTasks();
+    updateTaskCount();
+  }
+
+  // 渲染任务列表
+  function renderTasks() {
+    const tbody = document.getElementById('tasks-table');
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const pageTasks = filteredTasks.slice(startIndex, endIndex);
+
+    tbody.innerHTML = '';
+
+    if (pageTasks.length === 0) {
+      tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                    ${filteredTasks.length === 0 ? '暂无任务' : '当前页面无任务'}
+                </td>
+            </tr>
+        `;
+    } else {
+      pageTasks.forEach(task => {
+        const row = createTaskRow(task);
+        tbody.appendChild(row);
+      });
+    }
+
+    updatePagination();
+  }
+
+  // 创建任务行
+  function createTaskRow(task) {
+    const row = document.createElement('tr');
+    row.className = 'hover:bg-gray-50';
+    row.dataset.taskId = task.id;
+
+    // 根据enabled字段和status字段综合判断任务状态
+    const isEnabled = task.enabled === true;
+    const statusText = isEnabled ? '已启用' : '已禁用';
+    const statusClass = isEnabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+
+    row.innerHTML = `
+        <td class="px-4 py-3 text-sm">
+            <input type="checkbox" class="task-checkbox rounded border-gray-300 text-primary focus:ring-primary" data-task-id="${task.id}">
+        </td>
+        <td class="px-4 py-3 text-sm text-gray-900 font-medium">${task.id}</td>
+        <td class="px-4 py-3 text-sm text-gray-500 hidden lg:table-cell">${task.script_path}</td>
+        <td class="px-4 py-3 text-sm text-gray-500">${task.interval_minutes} 分钟</td>
+        <td class="px-4 py-3">
+            <span class="px-2 py-1 text-xs font-medium rounded-full ${statusClass}">${statusText}</span>
+        </td>
+        <td class="px-4 py-3 text-sm">
+            <div class="flex items-center gap-2">
+                <button onclick="toggleTask('${task.id}')" 
+                    class="px-2 py-1 text-xs rounded ${isEnabled ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' : 'bg-green-100 text-green-800 hover:bg-green-200'}">
+                    ${isEnabled ? '禁用' : '启用'}
+                </button>
+                <button onclick="editTask('${task.id}')" 
+                    class="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded hover:bg-gray-200">
+                    编辑
+                </button>
+                <button onclick="runTask('${task.id}')" 
+                    class="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded hover:bg-blue-200">
+                    运行
+                </button>
+                <button onclick="showDeleteConfirm('${task.id}')" 
+                    class="px-2 py-1 text-xs bg-red-100 text-red-800 rounded hover:bg-red-200">
+                    删除
+                </button>
+            </div>
+        </td>
+    `;
+
+    return row;
+  }
+
+  // 更新分页信息
+  function updatePagination() {
+    const totalItems = filteredTasks.length;
+    const maxPage = Math.ceil(totalItems / pageSize);
+    const startItem = (currentPage - 1) * pageSize + 1;
+    const endItem = Math.min(currentPage * pageSize, totalItems);
+
+    document.getElementById('start-item').textContent = startItem;
+    document.getElementById('end-item').textContent = endItem;
+    document.getElementById('total-items').textContent = totalItems;
+    document.getElementById('page-info').textContent = `第 ${currentPage} 页`;
+
+    document.getElementById('prev-page').disabled = currentPage <= 1;
+    document.getElementById('next-page').disabled = currentPage >= maxPage;
+  }
+
+  // 更新任务数量
+  function updateTaskCount() {
+    const count = filteredTasks.length;
+    document.getElementById('task-count').textContent = `${count} 个任务`;
+  }
+
+  // 显示添加任务弹窗
+  function showAddTaskModal() {
+    document.getElementById('add-task-modal').classList.remove('hidden');
+    document.getElementById('add-task-form').reset();
+  }
+
+  // 隐藏添加任务弹窗
+  function hideAddTaskModal() {
+    document.getElementById('add-task-modal').classList.add('hidden');
+  }
+
+  // 添加任务
+  async function addTask() {
+    const form = document.getElementById('add-task-form');
+    const formData = new FormData(form);
+
+    const taskData = {
+      id: formData.get('id'),
+      script_path: formData.get('script_path'),
+      interval_minutes: parseInt(formData.get('interval_minutes')),
+      execute_path: formData.get('execute_path') || '',
+      enabled: formData.get('enabled') === 'on'
+    };
+
+    try {
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(taskData)
+      });
+
+      if (response.ok) {
+        showToast('任务添加成功', 'success');
+        hideAddTaskModal();
+        loadTasks();
+      } else {
+        const error = await response.text();
+        showToast(`添加任务失败: ${error}`, 'error');
+      }
+    } catch (error) {
+      console.error('Error adding task:', error);
+      showToast('添加任务失败', 'error');
+    }
+  }
+
+  // 切换任务状态
+  async function toggleTask(taskId) {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/toggle`, {
+        method: 'POST'
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        showToast(result.message || '任务状态更新成功', 'success');
+        loadTasks();
+      } else {
+        const errorText = await response.text();
+        console.error('Failed to toggle task:', response.status, errorText);
+        showToast(`更新任务状态失败: ${response.status}`, 'error');
+      }
+    } catch (error) {
+      console.error('Error toggling task:', error);
+      showToast('更新任务状态失败: 网络错误', 'error');
+    }
+  }
+
+  // 运行任务
+  async function runTask(taskId) {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/run`, {
+        method: 'POST'
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        showToast(result.message, 'success');
+        // 刷新任务列表以显示最新状态
+        loadTasks();
+      } else {
+        const errorText = await response.text();
+        let errorMessage = '启动任务失败';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.detail || errorMessage;
+        } catch (e) {
+          errorMessage = errorText;
+        }
+        showToast(errorMessage, 'error');
+      }
+    } catch (error) {
+      console.error('Error running task:', error);
+      showToast('启动任务失败', 'error');
+    }
+  }
+
+  // 显示删除确认弹窗
+  function showDeleteConfirm(taskId) {
+    const task = allTasks.find(t => t.id === taskId);
+    if (task) {
+      taskToDelete = taskId;
+      document.getElementById('delete-task-name').textContent = task.id;
+      document.getElementById('delete-confirm-modal').classList.remove('hidden');
+    }
+  }
+
+  // 隐藏删除确认弹窗
+  function hideDeleteConfirmModal() {
+    document.getElementById('delete-confirm-modal').classList.add('hidden');
+    taskToDelete = null;
+  }
+
+  // 显示编辑任务弹窗
+  function showEditTaskModal(taskId) {
+    const task = allTasks.find(t => t.id === taskId);
+    if (task) {
+      taskToEdit = taskId;
+      const form = document.getElementById('edit-task-form');
+      
+      // 填充表单数据
+      form.querySelector('[name="edit_id"]').value = task.id;
+      form.querySelector('[name="edit_script_path"]').value = task.script_path;
+      form.querySelector('[name="edit_interval_minutes"]').value = task.interval_minutes;
+      form.querySelector('[name="edit_execute_path"]').value = task.execute_path || '';
+      form.querySelector('[name="edit_enabled"]').checked = task.enabled;
+      
+      document.getElementById('edit-task-modal').classList.remove('hidden');
+    }
+  }
+
+  // 隐藏编辑任务弹窗
+  function hideEditTaskModal() {
+    document.getElementById('edit-task-modal').classList.add('hidden');
+    taskToEdit = null;
+  }
+
+  // 编辑任务
+  function editTask(taskId) {
+    showEditTaskModal(taskId);
+  }
+
+  // 更新任务
+  async function updateTask() {
+    const form = document.getElementById('edit-task-form');
+    const formData = new FormData(form);
+
+    const taskData = {
+      script_path: formData.get('edit_script_path'),
+      interval_minutes: parseInt(formData.get('edit_interval_minutes')),
+      execute_path: formData.get('edit_execute_path') || '',
+      enabled: formData.get('edit_enabled') === 'on'
+    };
+
+    try {
+      const response = await fetch(`/api/tasks/${taskToEdit}`, {
+        method: 'PUT',
+      headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(taskData)
+      });
+
+      if (response.ok) {
+        showToast('任务更新成功', 'success');
+        hideEditTaskModal();
+        loadTasks();
+    } else {
+        const error = await response.text();
+        showToast(`更新任务失败: ${error}`, 'error');
+      }
+    } catch (error) {
+      console.error('Error updating task:', error);
+      showToast('更新任务失败', 'error');
+    }
+  }
+
+  // 删除任务
+  async function deleteTask(taskId) {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        showToast('任务删除成功', 'success');
+        hideDeleteConfirmModal();
+        loadTasks();
+      } else {
+        showToast('删除任务失败', 'error');
+      }
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      showToast('删除任务失败', 'error');
+    }
+  }
+
+  // 显示提示消息
+  function showToast(message, type = 'info') {
+    // 创建提示元素
+    const toast = document.createElement('div');
+    toast.className = `fixed top-4 left-1/2 px-6 py-3 rounded-lg text-white z-50 shadow-lg ${type === 'success' ? 'bg-green-500' :
+        type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+      }`;
+    toast.style.transform = 'translateX(-50%)';
+    toast.style.transition = 'none';
+    toast.textContent = message;
+
+    document.body.appendChild(toast);
+
+    // 3秒后自动移除
+    setTimeout(() => {
+      document.body.removeChild(toast);
+    }, 3000);
+  }
+
+  // 批量操作相关函数
+  let selectedTasks = new Set();
+
+  // 初始化批量操作事件监听
+  function initBatchOperations() {
+    // 全选复选框
+    document.getElementById('select-all-checkbox').addEventListener('change', function() {
+      const checkboxes = document.querySelectorAll('.task-checkbox');
+      checkboxes.forEach(checkbox => {
+        checkbox.checked = this.checked;
+        if (this.checked) {
+          selectedTasks.add(checkbox.dataset.taskId);
+        } else {
+          selectedTasks.delete(checkbox.dataset.taskId);
+        }
+      });
+      updateBatchToolbar();
+    });
+
+    // 单个任务复选框
+    document.addEventListener('change', function(e) {
+      if (e.target.classList.contains('task-checkbox')) {
+        if (e.target.checked) {
+          selectedTasks.add(e.target.dataset.taskId);
+        } else {
+          selectedTasks.delete(e.target.dataset.taskId);
+        }
+        updateBatchToolbar();
+        updateSelectAllCheckbox();
+      }
+    });
+
+    // 批量操作按钮
+    document.getElementById('batch-enable').addEventListener('click', () => batchToggleTasks(true));
+    document.getElementById('batch-disable').addEventListener('click', () => batchToggleTasks(false));
+    document.getElementById('batch-run').addEventListener('click', batchRunTasks);
+    document.getElementById('batch-delete').addEventListener('click', batchDeleteTasks);
+    document.getElementById('batch-clear-history').addEventListener('click', batchClearHistory);
+    document.getElementById('select-all').addEventListener('click', selectAllTasks);
+    document.getElementById('clear-selection').addEventListener('click', clearSelection);
+  }
+
+  // 更新批量操作工具栏
+  function updateBatchToolbar() {
+    const toolbar = document.getElementById('batch-toolbar');
+    const count = document.getElementById('selected-count');
+    
+    if (selectedTasks.size > 0) {
+      toolbar.classList.remove('hidden');
+      count.textContent = selectedTasks.size;
+    } else {
+      toolbar.classList.add('hidden');
+    }
+  }
+
+  // 更新全选复选框状态
+  function updateSelectAllCheckbox() {
+    const selectAllCheckbox = document.getElementById('select-all-checkbox');
+    const checkboxes = document.querySelectorAll('.task-checkbox');
+    const checkedCount = document.querySelectorAll('.task-checkbox:checked').length;
+    
+    if (checkedCount === 0) {
+      selectAllCheckbox.checked = false;
+      selectAllCheckbox.indeterminate = false;
+    } else if (checkedCount === checkboxes.length) {
+      selectAllCheckbox.checked = true;
+      selectAllCheckbox.indeterminate = false;
+    } else {
+      selectAllCheckbox.checked = false;
+      selectAllCheckbox.indeterminate = true;
+    }
+  }
+
+  // 全选任务
+  function selectAllTasks() {
+    const checkboxes = document.querySelectorAll('.task-checkbox');
+    checkboxes.forEach(checkbox => {
+      checkbox.checked = true;
+      selectedTasks.add(checkbox.dataset.taskId);
+    });
+    document.getElementById('select-all-checkbox').checked = true;
+    updateBatchToolbar();
+  }
+
+  // 取消选择
+  function clearSelection() {
+    const checkboxes = document.querySelectorAll('.task-checkbox');
+    checkboxes.forEach(checkbox => {
+      checkbox.checked = false;
+    });
+    document.getElementById('select-all-checkbox').checked = false;
+    selectedTasks.clear();
+    updateBatchToolbar();
+  }
+
+  // 批量切换任务状态
+  async function batchToggleTasks(enable) {
+    if (selectedTasks.size === 0) {
+      showToast('请先选择要操作的任务', 'error');
+      return;
+    }
+
+    const taskIds = Array.from(selectedTasks);
+    const action = enable ? '启用' : '禁用';
+
+    try {
+      const response = await fetch('/api/tasks/batch/toggle', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          task_ids: taskIds,
+          enable: enable
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        showToast(result.message, 'success');
+        clearSelection();
+        loadTasks();
+      } else {
+        const error = await response.text();
+        showToast(`批量${action}失败: ${error}`, 'error');
+      }
+    } catch (error) {
+      console.error('Error batch toggling tasks:', error);
+      showToast(`批量${action}失败`, 'error');
+    }
+  }
+
+  // 批量运行任务
+  async function batchRunTasks() {
+    if (selectedTasks.size === 0) {
+      showToast('请先选择要运行的任务', 'error');
+      return;
+    }
+
+    const taskIds = Array.from(selectedTasks);
+
+    try {
+      const response = await fetch('/api/tasks/batch/run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          task_ids: taskIds
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        showToast(result.message, 'success');
+        clearSelection();
+        loadTasks();
+      } else {
+        const error = await response.text();
+        showToast(`批量运行失败: ${error}`, 'error');
+      }
+    } catch (error) {
+      console.error('Error batch running tasks:', error);
+      showToast('批量运行失败', 'error');
+    }
+  }
+
+  // 批量删除任务
+  async function batchDeleteTasks() {
+    if (selectedTasks.size === 0) {
+      showToast('请先选择要删除的任务', 'error');
+      return;
+    }
+
+    const taskIds = Array.from(selectedTasks);
+    
+    if (!confirm(`确定要删除选中的 ${taskIds.length} 个任务吗？此操作不可恢复。`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/tasks/batch/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          task_ids: taskIds
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        showToast(result.message, 'success');
+        clearSelection();
+        loadTasks();
+    } else {
+        const error = await response.text();
+        showToast(`批量删除失败: ${error}`, 'error');
+      }
+    } catch (error) {
+      console.error('Error batch deleting tasks:', error);
+      showToast('批量删除失败', 'error');
+    }
+  }
+
+  // 批量清空历史
+  async function batchClearHistory() {
+    if (selectedTasks.size === 0) {
+      showToast('请先选择要清空历史的任务', 'error');
+      return;
+    }
+
+    const taskIds = Array.from(selectedTasks);
+    
+    if (!confirm(`确定要清空选中 ${taskIds.length} 个任务的历史记录吗？`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/tasks/batch/clear-history', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          task_ids: taskIds
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        showToast(result.message, 'success');
+        clearSelection();
+        loadTasks();
+      } else {
+        const error = await response.text();
+        showToast(`批量清空历史失败: ${error}`, 'error');
+      }
+    } catch (error) {
+      console.error('Error batch clearing history:', error);
+      showToast('批量清空历史失败', 'error');
+    }
+  }
+
+  // 页面加载完成后初始化批量操作
+  document.addEventListener('DOMContentLoaded', function() {
+    initBatchOperations();
+  });
+</script>
+{% endblock %}

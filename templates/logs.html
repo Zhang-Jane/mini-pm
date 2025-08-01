@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+
+{% block title %}日志查看 - Mini PM2{% endblock %}
+{% block page_title %}日志查看{% endblock %}
+
+{% block content %}
+<div class="page-content">
+  <div class="bg-white rounded-lg shadow-sm card-container">
+    <div class="p-4 md:p-6 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-800">实时日志查看</h3>
+            <div class="flex items-center gap-4">
+                <span class="text-sm text-gray-500">日志数量: <span id="log-count" class="font-medium">0</span></span>
+                
+                <!-- 最大行数配置 -->
+                <div class="flex items-center gap-2">
+                    <label class="text-sm text-gray-600">最大行数:</label>
+                    <select id="max-lines" class="px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary focus:border-transparent">
+                        <option value="100">100</option>
+                        <option value="500">500</option>
+                        <option value="1000" selected>1000</option>
+                        <option value="2000">2000</option>
+                        <option value="5000">5000</option>
+                    </select>
+                </div>
+                
+                <!-- 日志过滤器 -->
+                <div class="flex items-center gap-2">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="filter-error" checked class="mr-1">
+                        <span class="text-sm text-red-600">错误</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" id="filter-warning" checked class="mr-1">
+                        <span class="text-sm text-yellow-600">警告</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" id="filter-info" checked class="mr-1">
+                        <span class="text-sm text-blue-600">信息</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" id="filter-debug" class="mr-1">
+                        <span class="text-sm text-gray-600">调试</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="p-4 md:p-6">
+        <div class="log-container" id="log-container">
+            <div class="text-center text-gray-500">等待日志...</div>
+        </div>
+        
+        <div class="flex justify-end gap-3 mt-4">
+            <button class="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                    onclick="clearLogs()">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+                清空日志
+            </button>
+            
+            <button class="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                    onclick="toggleAutoScroll()" id="auto-scroll-btn">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16l4-4m0 0l4 4m-4-4v12"></path>
+                </svg>
+                自动滚动
+            </button>
+            
+            <button class="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                    onclick="exportLogs()">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                导出日志
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 日志统计 -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mt-6 md:mt-8">
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-600">错误</p>
+                <p class="text-2xl font-bold text-error" id="error-count">0</p>
+            </div>
+            <svg class="w-8 h-8 text-error" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        </div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-600">警告</p>
+                <p class="text-2xl font-bold text-warning" id="warning-count">0</p>
+            </div>
+            <svg class="w-8 h-8 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+        </div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-600">信息</p>
+                <p class="text-2xl font-bold text-info" id="info-count">0</p>
+            </div>
+            <svg class="w-8 h-8 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        </div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-600">调试</p>
+                <p class="text-2xl font-bold text-gray-600" id="debug-count">0</p>
+            </div>
+            <svg class="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let autoScroll = true;
+let logCount = 0;
+let errorCount = 0;
+let warningCount = 0;
+let infoCount = 0;
+let debugCount = 0;
+let allLogs = [];
+let maxLines = 1000;
+
+// 更新统计信息
+function updateStats() {
+    document.getElementById('log-count').textContent = logCount;
+    document.getElementById('error-count').textContent = errorCount;
+    document.getElementById('warning-count').textContent = warningCount;
+    document.getElementById('info-count').textContent = infoCount;
+    document.getElementById('debug-count').textContent = debugCount;
+}
+
+// 添加日志
+function appendLog(message) {
+    const container = document.getElementById('log-container');
+    
+    // 检查过滤器
+    const shouldShow = checkFilter(message);
+    if (!shouldShow) return;
+    
+    const logDiv = document.createElement('div');
+    
+    let cssClass = 'log-info';
+    if (message.includes('[ERROR]')) {
+        cssClass = 'log-error';
+        errorCount++;
+    } else if (message.includes('[WARNING]')) {
+        cssClass = 'log-warning';
+        warningCount++;
+    } else if (message.includes('[DEBUG]')) {
+        cssClass = 'log-debug';
+        debugCount++;
+    } else {
+        infoCount++;
+    }
+    
+    logDiv.className = cssClass;
+    logDiv.textContent = message;
+    container.appendChild(logDiv);
+    
+    // 检查最大行数限制
+    const visibleLogs = container.querySelectorAll('div[class^="log-"]');
+    if (visibleLogs.length > maxLines) {
+        container.removeChild(visibleLogs[0]);
+        logCount--;
+    }
+    
+    if (autoScroll) {
+        container.scrollTop = container.scrollHeight;
+    }
+    
+    allLogs.push({ message, timestamp: new Date(), type: cssClass });
+    updateStats();
+}
+
+// 检查过滤器
+function checkFilter(message) {
+    if (message.includes('[ERROR]') && !document.getElementById('filter-error').checked) return false;
+    if (message.includes('[WARNING]') && !document.getElementById('filter-warning').checked) return false;
+    if (message.includes('[DEBUG]') && !document.getElementById('filter-debug').checked) return false;
+    if (message.includes('[INFO]') && !document.getElementById('filter-info').checked) return false;
+    // 如果消息不包含任何日志级别标记，默认显示
+    if (!message.includes('[ERROR]') && !message.includes('[WARNING]') && !message.includes('[DEBUG]') && !message.includes('[INFO]')) {
+        return document.getElementById('filter-info').checked;
+    }
+    return true;
+}
+
+// 清空日志
+function clearLogs() {
+    document.getElementById('log-container').innerHTML = '<div class="text-center text-gray-500">日志已清空</div>';
+    logCount = 0;
+    errorCount = 0;
+    warningCount = 0;
+    infoCount = 0;
+    debugCount = 0;
+    allLogs = [];
+    updateStats();
+}
+
+// 切换自动滚动
+function toggleAutoScroll() {
+    autoScroll = !autoScroll;
+    const btn = document.getElementById('auto-scroll-btn');
+    if (autoScroll) {
+        btn.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16l4-4m0 0l4 4m-4-4v12"></path></svg>自动滚动';
+    } else {
+        btn.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-4m0 0l4 4m-4-4v12"></path></svg>手动滚动';
+    }
+    showToast(`自动滚动已${autoScroll ? '启用' : '禁用'}`, autoScroll ? 'success' : 'warning');
+}
+
+// 导出日志
+function exportLogs() {
+    if (allLogs.length === 0) {
+        showToast('没有日志可导出', 'warning');
+        return;
+    }
+    
+    const content = allLogs.map(log => 
+        `[${log.timestamp.toISOString()}] ${log.message}`
+    ).join('\n');
+    
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `logs_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showToast('日志已导出', 'success');
+}
+
+// 重新应用过滤器
+function reapplyFilters() {
+    const container = document.getElementById('log-container');
+    container.innerHTML = '';
+    
+    logCount = 0;
+    errorCount = 0;
+    warningCount = 0;
+    infoCount = 0;
+    debugCount = 0;
+    
+    allLogs.forEach(log => {
+        if (checkFilter(log.message)) {
+            const logDiv = document.createElement('div');
+            logDiv.className = log.type;
+            logDiv.textContent = log.message;
+            container.appendChild(logDiv);
+            
+            if (log.type === 'log-error') errorCount++;
+            else if (log.type === 'log-warning') warningCount++;
+            else if (log.type === 'log-debug') debugCount++;
+            else infoCount++;
+            
+            logCount++;
+        }
+    });
+    
+    updateStats();
+}
+
+// 过滤器事件监听
+document.getElementById('filter-error').addEventListener('change', reapplyFilters);
+document.getElementById('filter-warning').addEventListener('change', reapplyFilters);
+document.getElementById('filter-info').addEventListener('change', reapplyFilters);
+document.getElementById('filter-debug').addEventListener('change', reapplyFilters);
+
+// 最大行数配置事件监听
+document.getElementById('max-lines').addEventListener('change', function() {
+    maxLines = parseInt(this.value);
+    localStorage.setItem('log-max-lines', this.value);
+    showToast(`最大行数已设置为 ${maxLines}`, 'info');
+});
+
+// 页面加载时加载配置
+document.addEventListener('DOMContentLoaded', function() {
+    const savedValue = localStorage.getItem('log-max-lines');
+    if (savedValue) {
+        document.getElementById('max-lines').value = savedValue;
+        maxLines = parseInt(savedValue);
+    }
+});
+
+// WebSocket 连接
+let ws = null;
+
+function connectWebSocket() {
+    ws = new WebSocket(`ws://${window.location.host}/ws/logs`);
+    
+    ws.onopen = function() {
+        updateConnectionStatus('已连接', true);
+    };
+    
+    ws.onclose = function() {
+        updateConnectionStatus('已断开', false);
+        // 重连
+        setTimeout(connectWebSocket, 3000);
+    };
+    
+    ws.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        if (data.type === 'log') {
+            appendLog(data.message);
+        }
+    };
+}
+
+// 页面加载时连接 WebSocket
+document.addEventListener('DOMContentLoaded', function() {
+    connectWebSocket();
+});
+</script>
+{% endblock %} 

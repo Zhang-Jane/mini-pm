@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Mini PM2{% endblock %}</title>
+    
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <!-- WebSocket 支持 -->
+    <script src="https://unpkg.com/htmx.org/dist/ext/ws.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        success: '#10B981',
+                        warning: '#F59E0B',
+                        error: '#EF4444'
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* 防止页面跳动 */
+        html, body {
+            overflow-x: hidden;
+        }
+        
+        .log-container {
+            font-family: 'Courier New', monospace;
+            background-color: #1F2937;
+            color: #10B981;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .log-error { color: #EF4444; }
+        .log-warning { color: #F59E0B; }
+        .log-info { color: #10B981; }
+        .log-debug { color: #9CA3AF; }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* 确保页面内容区域高度一致 */
+        .page-content {
+            min-height: calc(100vh - 200px);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* 确保卡片容器高度一致 */
+        .card-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* 表格容器固定高度 */
+        .table-container {
+            flex: 1;
+            overflow: auto;
+        }
+        
+        /* 侧边栏折叠样式 - 使用transform */
+        .sidebar-collapsed {
+            transform: translateX(-16rem);
+        }
+        
+
+        
+        .sidebar-collapsed .sidebar-text {
+            display: none;
+        }
+        
+        .sidebar-collapsed .sidebar-icon {
+            margin: 0 auto;
+        }
+        
+        /* 主内容区域响应式调整 */
+        .main-content-expanded {
+            margin-left: 0;
+        }
+        
+        /* 防止页面宽度变化 - 主内容区域始终占满全屏 */
+        .main-content {
+            width: 100vw;
+            transition: margin-left 0.3s ease;
+            flex: 1;
+            min-width: 0;
+            overflow-x: hidden;
+            position: relative;
+            margin-left: 16rem;
+        }
+        
+        .sidebar-collapsed + .main-content {
+            margin-left: 0;
+        }
+        
+        /* 确保过渡效果平滑 */
+        #sidebar, .main-content {
+            will-change: width;
+        }
+        
+        /* 确保侧边栏宽度固定 - 使用绝对定位 */
+        #sidebar {
+            min-width: 16rem;
+            max-width: 16rem;
+            width: 16rem;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
+        
+        #sidebar.sidebar-collapsed {
+            min-width: 4rem;
+            max-width: 4rem;
+            width: 4rem;
+            flex-shrink: 0;
+        }
+        
+
+        
+        /* 确保侧边栏内容不会影响宽度 */
+        #sidebar > * {
+            box-sizing: border-box;
+        }
+        
+        /* 防止侧边栏内容溢出 */
+        #sidebar > * {
+            overflow: hidden;
+        }
+        
+        /* 防止布局跳动 */
+        .layout-container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        /* 使用绝对定位避免布局重排 */
+        #sidebar {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            z-index: 10;
+            transform: translateX(0);
+            transition: transform 0.3s ease;
+        }
+        
+        /* 折叠时使用transform隐藏，避免宽度变化 */
+        #sidebar.sidebar-collapsed {
+            transform: translateX(-16rem);
+        }
+        
+        /* 防止内容区域拉升 */
+        .content-wrapper {
+            width: 100%;
+            max-width: none;
+            margin: 0;
+            padding: 0;
+            transform: translateZ(0);
+            backface-visibility: hidden;
+        }
+        
+        /* 确保侧边栏切换时不会闪动 */
+        #sidebar {
+            transform: translateZ(0);
+            backface-visibility: hidden;
+        }
+        
+        /* 防止侧边栏内容在切换时溢出 */
+        .sidebar-text {
+            white-space: nowrap;
+            overflow: hidden;
+        }
+        
+
+        
+        /* 移动端优化 */
+        @media (max-width: 768px) {
+            .sidebar-collapsed {
+                width: 0 !important;
+                overflow: hidden;
+                transform: translateX(-100%);
+            }
+            
+            .main-content {
+                width: 100vw !important;
+            }
+            
+            .page-content {
+                min-height: calc(100vh - 150px);
+            }
+            
+            .card-container {
+                min-height: auto;
+            }
+            
+            /* 移动端侧边栏切换按钮 */
+            #sidebar-toggle {
+                display: block;
+            }
+        }
+        
+        /* 桌面端侧边栏切换按钮 */
+        @media (min-width: 769px) {
+            #sidebar-toggle {
+                display: block;
+            }
+        }
+        
+        /* 确保表格在小屏幕上可以水平滚动 */
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+    </style>
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- 左侧导航栏 -->
+    <div class="flex overflow-hidden layout-container">
+        <aside id="sidebar" class="w-64 bg-white shadow-lg min-h-screen transition-all duration-300 flex-shrink-0">
+            <div class="p-6">
+                <div class="flex items-center gap-3">
+                    <svg class="w-8 h-8 text-primary sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                    <span class="text-xl font-bold text-gray-800 sidebar-text">Mini PM2</span>
+                </div>
+            </div>
+            
+            <nav class="mt-8">
+                <a href="/" class="nav-link flex items-center gap-3 px-6 py-3 text-primary bg-blue-50 border-r-2 border-primary" data-page="dashboard">
+                    <svg class="w-5 h-5 sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z"></path>
+                    </svg>
+                    <span class="sidebar-text">仪表板</span>
+                </a>
+                
+                <a href="/tasks" class="nav-link flex items-center gap-3 px-6 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900" data-page="tasks">
+                    <svg class="w-5 h-5 sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                    </svg>
+                    <span class="sidebar-text">任务管理</span>
+                </a>
+                
+                <a href="/logs" class="nav-link flex items-center gap-3 px-6 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900" data-page="logs">
+                    <svg class="w-5 h-5 sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <span class="sidebar-text">日志查看</span>
+                </a>
+                
+                <a href="/settings" class="nav-link flex items-center gap-3 px-6 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900" data-page="settings">
+                    <svg class="w-5 h-5 sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <span class="sidebar-text">系统设置</span>
+                </a>
+            </nav>
+        </aside>
+        
+        <!-- 主内容区 -->
+        <div class="flex-1 flex flex-col min-h-screen main-content">
+            <!-- 顶部状态栏 -->
+            <header class="bg-white border-b border-gray-200 px-4 md:px-6 py-4 flex-shrink-0">
+                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-4">
+                    <button id="sidebar-toggle" class="text-gray-600 hover:text-gray-900 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                    </button>
+                    <h1 class="text-xl font-semibold text-gray-800">{% block page_title %}仪表板{% endblock %}</h1>
+                </div>
+                    
+                    <div class="flex items-center gap-4">
+                        <div class="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+                            <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span id="connection-status">已连接</span>
+                        </div>
+                        <button class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                            </svg>
+                        </button>
+                        <div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium text-gray-700">
+                            A
+                        </div>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- 页面内容 -->
+            <main class="flex-1 p-4 md:p-6 overflow-auto">
+                <div class="content-wrapper">
+                    {% block content %}{% endblock %}
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <!-- 全局 JavaScript -->
+    <script>
+        // 连接状态管理
+        function updateConnectionStatus(status, isConnected) {
+            const statusEl = document.getElementById('connection-status');
+            const container = statusEl.parentElement;
+            
+            if (isConnected) {
+                statusEl.textContent = '已连接';
+                container.className = 'flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm';
+                container.querySelector('div').className = 'w-2 h-2 bg-green-500 rounded-full';
+            } else {
+                statusEl.textContent = '已断开';
+                container.className = 'flex items-center gap-2 px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm';
+                container.querySelector('div').className = 'w-2 h-2 bg-red-500 rounded-full';
+            }
+        }
+        
+        // 工具函数
+        window.showToast = function(message, type = 'info') {
+            const toast = document.createElement('div');
+            const colors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                warning: 'bg-yellow-500',
+                info: 'bg-blue-500'
+            };
+            
+            toast.className = `fixed top-4 left-1/2 transform -translate-x-1/2 z-50 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg`;
+            toast.style.transform = 'translateX(-50%)';
+            toast.style.transition = 'none';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        };
+        
+        window.confirmAction = function(message, callback) {
+            if (confirm(message)) {
+                callback();
+            }
+        };
+        
+        // 侧边栏折叠功能
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebar = document.getElementById('sidebar');
+            const sidebarToggle = document.getElementById('sidebar-toggle');
+            const isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+            
+            // 初始化状态 - 防止初始闪动
+            if (isCollapsed) {
+                sidebar.style.transition = 'none';
+                sidebar.classList.add('sidebar-collapsed');
+                requestAnimationFrame(() => {
+                    sidebar.style.transition = 'all 0.3s ease';
+                });
+            }
+            
+            // 切换侧边栏 - 使用绝对定位避免布局重排
+            sidebarToggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // 切换状态
+                const isCurrentlyCollapsed = sidebar.classList.contains('sidebar-collapsed');
+                if (isCurrentlyCollapsed) {
+                    sidebar.classList.remove('sidebar-collapsed');
+                } else {
+                    sidebar.classList.add('sidebar-collapsed');
+                }
+                
+                const isNowCollapsed = sidebar.classList.contains('sidebar-collapsed');
+                localStorage.setItem('sidebar-collapsed', isNowCollapsed);
+            });
+            
+            // 设置当前页面的高亮状态
+            const currentPath = window.location.pathname;
+            const navLinks = document.querySelectorAll('.nav-link');
+            
+            navLinks.forEach(link => {
+                const href = link.getAttribute('href');
+                if (href === currentPath) {
+                    // 移除所有高亮
+                    navLinks.forEach(l => {
+                        l.classList.remove('text-primary', 'bg-blue-50', 'border-r-2', 'border-primary');
+                        l.classList.add('text-gray-600', 'hover:bg-gray-50', 'hover:text-gray-900');
+                    });
+                    
+                    // 添加当前页面高亮
+                    link.classList.remove('text-gray-600', 'hover:bg-gray-50', 'hover:text-gray-900');
+                    link.classList.add('text-primary', 'bg-blue-50', 'border-r-2', 'border-primary');
+                }
+            });
+        });
+    </script>
+    
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html> 

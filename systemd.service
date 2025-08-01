@@ -1,0 +1,24 @@
+[Unit]
+Description=Mini PM2 Task Scheduler
+After=network.target redis.service
+Wants=redis.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/path/to/mini-pm2
+Environment=STORAGE_TYPE=redis
+Environment=REDIS_URL=redis://localhost:6379
+Environment=LOG_LIMIT=500
+Environment=CHECK_INTERVAL=30
+ExecStart=/usr/local/bin/uvicorn main:app --host 0.0.0.0 --port 8100
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mini-pm2
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,369 @@
+ @tailwind base;
+ @tailwind components;
+ @tailwind utilities;
+
+ /* 自定义颜色变量 */
+ :root {
+   --color-primary: #3B82F6;
+   --color-primary-dark: #2563EB;
+   --color-success: #10B981;
+   --color-warning: #F59E0B;
+   --color-error: #EF4444;
+   --color-info: #06B6D4;
+ }
+
+ /* 基础样式 */
+ @layer base {
+   html {
+     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+   }
+
+   body {
+     @apply bg-gray-50 text-gray-900;
+   }
+
+   /* 滚动条样式 */
+   ::-webkit-scrollbar {
+     width: 6px;
+     height: 6px;
+   }
+
+   ::-webkit-scrollbar-track {
+     @apply bg-gray-100;
+   }
+
+   ::-webkit-scrollbar-thumb {
+     @apply bg-gray-300 rounded;
+   }
+
+   ::-webkit-scrollbar-thumb:hover {
+     @apply bg-gray-400;
+   }
+ }
+
+ /* 组件样式 */
+ @layer components {
+
+   /* 按钮组件 */
+   .btn {
+     @apply inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
+   }
+
+   .btn-primary {
+     @apply bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500;
+   }
+
+   .btn-success {
+     @apply bg-green-600 text-white hover:bg-green-700 focus:ring-green-500;
+   }
+
+   .btn-warning {
+     @apply bg-yellow-600 text-white hover:bg-yellow-700 focus:ring-yellow-500;
+   }
+
+   .btn-error {
+     @apply bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+   }
+
+   .btn-secondary {
+     @apply bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-gray-500;
+   }
+
+   .btn-sm {
+     @apply px-3 py-1.5 text-sm;
+   }
+
+   .btn-lg {
+     @apply px-6 py-3 text-lg;
+   }
+
+   /* 卡片组件 */
+   .card {
+     @apply bg-white rounded-lg shadow-sm border border-gray-200;
+   }
+
+   .card-header {
+     @apply p-6 border-b border-gray-200;
+   }
+
+   .card-body {
+     @apply p-6;
+   }
+
+   .card-footer {
+     @apply p-6 border-t border-gray-200;
+   }
+
+   /* 表单组件 */
+   .form-input {
+     @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors;
+   }
+
+   .form-label {
+     @apply block text-sm font-medium text-gray-700 mb-2;
+   }
+
+   .form-error {
+     @apply text-red-600 text-sm mt-1;
+   }
+
+   /* 状态标签 */
+   .status-badge {
+     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+   }
+
+   .status-idle {
+     @apply bg-green-100 text-green-800;
+   }
+
+   .status-running {
+     @apply bg-blue-100 text-blue-800;
+   }
+
+   .status-failed {
+     @apply bg-red-100 text-red-800;
+   }
+
+   .status-disabled {
+     @apply bg-gray-100 text-gray-800;
+   }
+
+   /* 日志容器 */
+   .log-container {
+     @apply font-mono text-sm bg-gray-900 text-green-400 rounded-lg p-4 max-h-96 overflow-y-auto;
+   }
+
+   .log-error {
+     @apply text-red-400;
+   }
+
+   .log-warning {
+     @apply text-yellow-400;
+   }
+
+   .log-info {
+     @apply text-blue-400;
+   }
+
+   .log-debug {
+     @apply text-gray-400;
+   }
+
+   /* 统计卡片 */
+   .stat-card {
+     @apply bg-white rounded-lg shadow-sm p-6;
+   }
+
+   .stat-value {
+     @apply text-2xl font-bold;
+   }
+
+   .stat-label {
+     @apply text-sm text-gray-600;
+   }
+
+   /* 导航链接 */
+   .nav-link {
+     @apply flex items-center gap-3 px-6 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors;
+   }
+
+   .nav-link.active {
+     @apply text-blue-600 bg-blue-50 border-r-2 border-blue-600;
+   }
+
+   /* 表格样式 */
+   .table {
+     @apply w-full border-collapse;
+   }
+
+   .table th {
+     @apply px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50;
+   }
+
+   .table td {
+     @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900 border-t border-gray-200;
+   }
+
+   .table tbody tr:hover {
+     @apply bg-gray-50;
+   }
+
+   /* 模态框 */
+   .modal {
+     @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
+   }
+
+   .modal-content {
+     @apply bg-white rounded-lg shadow-xl max-w-md w-full mx-4;
+   }
+
+   /* 加载动画 */
+   .loading {
+     @apply inline-flex items-center;
+   }
+
+   .loading::after {
+     content: '';
+     @apply w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin ml-2;
+   }
+
+   /* 淡入动画 */
+   .fade-in {
+     animation: fadeIn 0.3s ease-in;
+   }
+
+   @keyframes fadeIn {
+     from {
+       opacity: 0;
+       transform: translateY(10px);
+     }
+
+     to {
+       opacity: 1;
+       transform: translateY(0);
+     }
+   }
+
+   /* 滑入动画 */
+   .slide-in {
+     animation: slideIn 0.3s ease-out;
+   }
+
+   @keyframes slideIn {
+     from {
+       opacity: 0;
+       transform: translateX(-20px);
+     }
+
+     to {
+       opacity: 1;
+       transform: translateX(0);
+     }
+   }
+
+   /* 脉冲动画 */
+   .pulse {
+     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+   }
+
+   @keyframes pulse {
+
+     0%,
+     100% {
+       opacity: 1;
+     }
+
+     50% {
+       opacity: 0.5;
+     }
+   }
+ }
+
+ /* 工具类 */
+ @layer utilities {
+
+   /* 文本截断 */
+   .text-truncate {
+     @apply overflow-hidden text-ellipsis whitespace-nowrap;
+   }
+
+   /* 多行文本截断 */
+   .text-clamp-2 {
+     display: -webkit-box;
+     -webkit-line-clamp: 2;
+     -webkit-box-orient: vertical;
+     overflow: hidden;
+   }
+
+   /* 自定义滚动条 */
+   .scrollbar-thin {
+     scrollbar-width: thin;
+   }
+
+   .scrollbar-thin::-webkit-scrollbar {
+     width: 4px;
+     height: 4px;
+   }
+
+   /* 响应式工具 */
+   .container-responsive {
+     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+   }
+
+   /* 网格布局 */
+   .grid-auto-fit {
+     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+   }
+
+   .grid-auto-fill {
+     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+   }
+
+   /* 阴影效果 */
+   .shadow-soft {
+     box-shadow: 0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04);
+   }
+
+   .shadow-medium {
+     box-shadow: 0 4px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+   }
+
+   /* 渐变背景 */
+   .bg-gradient-primary {
+     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+   }
+
+   .bg-gradient-success {
+     background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+   }
+
+   .bg-gradient-warning {
+     background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+   }
+
+   .bg-gradient-error {
+     background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+   }
+ }
+
+ /* 深色模式支持 */
+ @media (prefers-color-scheme: dark) {
+   .dark {
+     @apply bg-gray-900 text-gray-100;
+   }
+
+   .dark .card {
+     @apply bg-gray-800 border-gray-700;
+   }
+
+   .dark .form-input {
+     @apply bg-gray-700 border-gray-600 text-gray-100;
+   }
+
+   .dark .log-container {
+     @apply bg-gray-800 text-green-400;
+   }
+
+   .dark .table th {
+     @apply bg-gray-800 text-gray-300;
+   }
+
+   .dark .table td {
+     @apply text-gray-100 border-gray-700;
+   }
+
+   .dark .table tbody tr:hover {
+     @apply bg-gray-700;
+   }
+ }
+
+ /* 打印样式 */
+ @media print {
+   .no-print {
+     display: none !important;
+   }
+
+   .print-break {
+     page-break-before: always;
+   }
+ }

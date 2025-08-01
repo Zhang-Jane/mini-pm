@@ -1,0 +1,7 @@
+{
+    "id": "12",
+    "script_path": "test_script.py",
+    "interval_minutes": 1,
+    "enabled": false,
+    "execute_path": "python3"
+}

@@ -1,0 +1,745 @@
+{% extends "base.html" %}
+
+{% block title %}仪表板 - Mini PM2{% endblock %}
+{% block page_title %}仪表板{% endblock %}
+
+{% block content %}
+<div class="page-content">
+  <!-- 系统状态概览 -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-600">总任务数</p>
+                <p class="text-2xl font-bold text-primary" id="total-tasks">0</p>
+            </div>
+            <svg class="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+        </div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-600">运行中</p>
+                <p class="text-2xl font-bold text-success" id="running-tasks">0</p>
+            </div>
+            <svg class="w-8 h-8 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        </div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-600">失败任务</p>
+                <p class="text-2xl font-bold text-error" id="failed-tasks">0</p>
+            </div>
+            <svg class="w-8 h-8 text-error" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        </div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-600">日志数量</p>
+                <p class="text-2xl font-bold text-warning" id="log-count">0</p>
+            </div>
+            <svg class="w-8 h-8 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+        </div>
+    </div>
+</div>
+
+  <!-- 系统资源监控 -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 md:mb-8">
+    <!-- CPU 使用率 -->
+    <div class="bg-white rounded-lg shadow-sm">
+      <div class="p-4 md:p-6 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-800">CPU 使用率</h3>
+      </div>
+      <div class="p-4 md:p-6">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-2xl font-bold text-blue-600" id="cpu-usage">0%</span>
+          <div class="w-16 h-16 relative">
+            <svg class="w-16 h-16 transform -rotate-90" viewBox="0 0 36 36">
+              <path class="text-gray-200" stroke="currentColor" stroke-width="2" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+              <path class="text-blue-600" stroke="currentColor" stroke-width="2" fill="none" stroke-dasharray="0, 100" stroke-dashoffset="25" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" id="cpu-progress"/>
+            </svg>
+          </div>
+        </div>
+        <div class="text-sm text-gray-600">
+          <div class="flex justify-between">
+            <span>核心数:</span>
+            <span id="cpu-cores">-</span>
+          </div>
+          <div class="flex justify-between">
+            <span>频率:</span>
+            <span id="cpu-freq">-</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 内存使用率 -->
+    <div class="bg-white rounded-lg shadow-sm">
+      <div class="p-4 md:p-6 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-800">内存使用率</h3>
+      </div>
+      <div class="p-4 md:p-6">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-2xl font-bold text-green-600" id="memory-usage">0%</span>
+          <div class="w-16 h-16 relative">
+            <svg class="w-16 h-16 transform -rotate-90" viewBox="0 0 36 36">
+              <path class="text-gray-200" stroke="currentColor" stroke-width="2" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+              <path class="text-green-600" stroke="currentColor" stroke-width="2" fill="none" stroke-dasharray="0, 100" stroke-dashoffset="25" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" id="memory-progress"/>
+            </svg>
+          </div>
+        </div>
+        <div class="text-sm text-gray-600">
+          <div class="flex justify-between">
+            <span>已用:</span>
+            <span id="memory-used">-</span>
+          </div>
+          <div class="flex justify-between">
+            <span>总计:</span>
+            <span id="memory-total">-</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 系统信息 -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 md:mb-8">
+    <!-- 系统基本信息 -->
+    <div class="bg-white rounded-lg shadow-sm">
+      <div class="p-4 md:p-6 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-800">系统信息</h3>
+      </div>
+      <div class="p-4 md:p-6">
+        <div class="space-y-3 text-sm">
+          <div class="flex justify-between">
+            <span class="text-gray-600">系统名称:</span>
+            <span id="system-name">-</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600">系统版本:</span>
+            <span id="system-version">-</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600">系统运行时间:</span>
+            <span id="uptime">-</span>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- 应用信息 -->
+    <div class="bg-white rounded-lg shadow-sm">
+      <div class="p-4 md:p-6 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-800">应用信息</h3>
+      </div>
+      <div class="p-4 md:p-6">
+        <div class="space-y-3 text-sm">
+          <div class="flex justify-between">
+            <span class="text-gray-600">应用名称:</span>
+            <span>Mini PM2</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600">版本号:</span>
+            <span>v1.0.0</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600">配置文件:</span>
+            <span id="config-file">-</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600">存储类型:</span>
+            <span id="storage-type">-</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 监控指标 -->
+  <div class="bg-white rounded-lg shadow-sm">
+    <div class="p-4 md:p-6 border-b border-gray-200">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-800">监控指标</h3>
+        <button id="refresh-metrics" class="inline-flex items-center px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors">
+          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          刷新
+        </button>
+      </div>
+    </div>
+    <div class="p-4 md:p-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="text-center p-4 bg-blue-50 rounded-lg">
+          <div class="text-2xl font-bold text-blue-600" id="disk-usage">-</div>
+          <div class="text-sm text-gray-600">磁盘使用率</div>
+        </div>
+        <div class="text-center p-4 bg-yellow-50 rounded-lg">
+          <div class="text-2xl font-bold text-yellow-600" id="load-average">-</div>
+          <div class="text-sm text-gray-600">负载平均值</div>
+        </div>
+        <div class="text-center p-4 bg-purple-50 rounded-lg">
+          <div class="text-2xl font-bold text-purple-600" id="process-count">-</div>
+          <div class="text-sm text-gray-600">进程数量</div>
+        </div>
+        <div class="text-center p-4 bg-green-50 rounded-lg">
+          <div class="text-2xl font-bold text-green-600" id="disk-io">-</div>
+          <div class="text-sm text-gray-600">磁盘读写总量</div>
+        </div>
+      </div>
+    </div>
+</div>
+
+  <!-- 进程管理 -->
+<div class="bg-white rounded-lg shadow-sm">
+    <div class="p-4 md:p-6 border-b border-gray-200">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-800">进程管理</h3>
+        <button id="refresh-processes" class="inline-flex items-center px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors">
+          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          刷新
+        </button>
+      </div>
+    </div>
+    <div class="p-4 md:p-6">
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PID</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">进程名</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CPU%</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">内存%</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">启动时间</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                </tr>
+            </thead>
+          <tbody id="processes-table" class="bg-white divide-y divide-gray-200">
+            <tr>
+              <td colspan="7" class="px-6 py-4 text-center text-gray-500">加载中...</td>
+            </tr>
+            </tbody>
+        </table>
+</div>
+
+      <!-- 分页控件 -->
+      <div class="mt-4 flex items-center justify-between">
+        <div class="text-sm text-gray-700">
+          显示 <span id="processes-start">0</span> - <span id="processes-end">0</span> 条，共 <span id="processes-total">0</span> 条
+        </div>
+        <div class="flex items-center space-x-2">
+          <button id="prev-page" class="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            上一页
+          </button>
+          <span class="text-sm text-gray-700">
+            第 <span id="current-page">1</span> 页，共 <span id="total-pages">1</span> 页
+          </span>
+          <button id="next-page" class="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            下一页
+          </button>
+        </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// 全局变量
+let metricsData = {};
+let currentProcessPage = 1;
+let processPageSize = 20;
+let cachedAllProcesses = null; // 缓存所有进程数据
+let lastProcessRefresh = 0; // 上次刷新时间
+const PROCESS_CACHE_DURATION = 60000; // 缓存时间60秒
+
+// 页面加载时初始化
+document.addEventListener('DOMContentLoaded', function() {
+    loadSystemInfo();
+    loadMetrics();
+    loadProcesses();
+    
+    // 刷新按钮事件
+    document.getElementById('refresh-metrics').addEventListener('click', function() {
+        loadSystemInfo();
+        loadMetrics();
+        showToast('监控数据已刷新', 'success');
+    });
+    
+    // 进程刷新按钮事件
+    document.getElementById('refresh-processes').addEventListener('click', function() {
+        currentProcessPage = 1; // 重置到第一页
+        loadProcesses(true); // 强制刷新
+        showToast('进程列表已刷新', 'success');
+    });
+    
+    // 翻页按钮事件
+    document.getElementById('prev-page').addEventListener('click', function() {
+        if (currentProcessPage > 1) {
+            currentProcessPage--;
+            loadProcesses(false); // 使用缓存
+        }
+    });
+    
+    document.getElementById('next-page').addEventListener('click', function() {
+        currentProcessPage++;
+        loadProcesses(false); // 使用缓存
+    });
+    
+    // 定时刷新监控数据
+    setInterval(() => {
+        loadSystemInfo();
+        loadMetrics();
+    }, 30000); // 每30秒刷新一次
+    
+    // 定时刷新进程列表
+    setInterval(() => {
+        loadProcesses(true); // 强制刷新
+    }, 60000); // 每60秒刷新一次
+});
+
+// 加载系统信息
+async function loadSystemInfo() {
+    try {
+        const response = await fetch('/api/system/info');
+        if (response.ok) {
+            const data = await response.json();
+            updateSystemInfo(data);
+        }
+    } catch (error) {
+        console.error('Error loading system info:', error);
+    }
+}
+
+// 加载监控指标
+async function loadMetrics() {
+    try {
+        const response = await fetch('/api/monitoring/metrics');
+        if (response.ok) {
+            const data = await response.json();
+            updateMetrics(data);
+        }
+    } catch (error) {
+        console.error('Error loading metrics:', error);
+    }
+}
+
+// 安全设置文本内容的辅助函数
+function setText(id, value) {
+    const element = document.getElementById(id);
+    if (element) {
+        element.textContent = value;
+    }
+}
+
+// 安全设置HTML内容的辅助函数
+function setHTML(id, value) {
+    const element = document.getElementById(id);
+    if (element) {
+        element.innerHTML = value;
+    }
+}
+
+// 更新系统信息
+function updateSystemInfo(data) {
+    // 更新任务统计
+    setText('total-tasks', data.total_tasks || 0);
+    setText('running-tasks', data.running_tasks || 0);
+    setText('failed-tasks', data.failed_tasks || 0);
+    setText('log-count', data.log_count || 0);
+    
+    // 更新系统信息
+    setText('system-name', data.system_name || '-');
+    setText('system-version', data.system_version || '-');
+    setText('uptime', data.uptime_formatted || data.uptime || '-');
+    setText('config-file', data.config_file || '-');
+    setText('storage-type', data.storage_type || '-');
+    
+    // 更新CPU信息
+    if (data.cpu) {
+        setText('cpu-usage', `${data.cpu.percent || 0}%`);
+        setText('cpu-cores', data.cpu.cores || '-');
+        setText('cpu-freq', data.cpu.freq ? `${data.cpu.freq} MHz` : '-');
+        updateProgress('cpu-progress', data.cpu.percent || 0);
+    }
+    
+    // 更新内存信息
+    if (data.memory) {
+        setText('memory-usage', `${data.memory.percent || 0}%`);
+        setText('memory-used', data.memory.used_gb ? `${data.memory.used_gb} GB` : '-');
+        setText('memory-total', data.memory.total_gb ? `${data.memory.total_gb} GB` : '-');
+        updateProgress('memory-progress', data.memory.percent || 0);
+    }
+    
+    // 更新任务状态统计（如果可用）
+    if (data.task_status_stats) {
+        const stats = data.task_status_stats;
+        console.log('任务状态统计:', stats);
+    }
+    
+    // 更新WebSocket连接数（如果可用）
+    if (data.websocket_connections !== undefined) {
+        console.log('WebSocket连接数:', data.websocket_connections);
+    }
+}
+
+// 更新监控指标
+function updateMetrics(data) {
+    // 更新基本指标
+    setText('disk-usage', data.disk_usage || '-');
+    setText('load-average', data.load_average || '-');
+    setText('process-count', data.process_count || '-');
+    
+    // 更新磁盘IO信息
+    if (data.disk_io && Object.keys(data.disk_io).length > 0) {
+        const readFormatted = data.disk_io.read_formatted || '0 B';
+        const writeFormatted = data.disk_io.write_formatted || '0 B';
+        setHTML('disk-io', `读取:${readFormatted}<br>写入:${writeFormatted}`);
+    } else {
+        setHTML('disk-io', '读取:0 B<br>写入:0 B');
+    }
+    
+    // 更新CPU和内存信息（如果可用）
+    if (data.cpu && Object.keys(data.cpu).length > 0) {
+        const cpuPercent = data.cpu.percent || 0;
+        setText('cpu-usage', `${cpuPercent}%`);
+        updateProgress('cpu-progress', cpuPercent);
+        
+        if (data.cpu.count) {
+            setText('cpu-cores', data.cpu.count);
+        }
+        if (data.cpu.freq) {
+            setText('cpu-freq', `${data.cpu.freq} MHz`);
+        }
+    }
+    
+    if (data.memory && Object.keys(data.memory).length > 0) {
+        const memoryPercent = data.memory.percent || 0;
+        setText('memory-usage', `${memoryPercent}%`);
+        updateProgress('memory-progress', memoryPercent);
+        
+        if (data.memory.used) {
+            setText('memory-used', data.memory.used);
+        }
+        if (data.memory.total) {
+            setText('memory-total', data.memory.total);
+        }
+    }
+}
+
+// 加载进程列表
+async function loadProcesses(forceRefresh = false) {
+    const now = Date.now();
+    
+    // 检查是否需要刷新缓存
+    if (!forceRefresh && cachedAllProcesses && (now - lastProcessRefresh) < PROCESS_CACHE_DURATION) {
+        // 使用缓存数据
+        updateProcessesFromCache();
+        return;
+    }
+    
+    try {
+        // 如果是强制刷新或没有缓存，获取所有进程数据
+        if (forceRefresh || !cachedAllProcesses) {
+            const response = await fetch(`/api/system/processes?page=1&limit=1000`); // 获取更多数据
+            if (response.ok) {
+                const data = await response.json();
+                cachedAllProcesses = data;
+                lastProcessRefresh = now;
+            }
+        }
+        
+        // 从缓存中获取当前页数据
+        updateProcessesFromCache();
+    } catch (error) {
+        console.error('Error loading processes:', error);
+    }
+}
+
+// 从缓存更新进程列表
+function updateProcessesFromCache() {
+    if (!cachedAllProcesses) return;
+    
+    // 计算当前页的数据
+    const start = (currentProcessPage - 1) * processPageSize;
+    const end = start + processPageSize;
+    const pageData = {
+        processes: cachedAllProcesses.processes.slice(start, end),
+        total: cachedAllProcesses.total,
+        page: currentProcessPage,
+        limit: processPageSize,
+        total_pages: Math.ceil(cachedAllProcesses.total / processPageSize),
+        has_prev: currentProcessPage > 1,
+        has_next: end < cachedAllProcesses.total
+    };
+    
+    updateProcesses(pageData);
+}
+
+// 更新进程列表
+function updateProcesses(data) {
+    const tbody = document.getElementById('processes-table');
+    
+    if (!data.processes || data.processes.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">暂无进程数据</td></tr>';
+        return;
+    }
+    
+    let html = '';
+    data.processes.forEach(process => {
+        const statusColor = process.status === 'running' ? 'text-green-600' : 
+                           process.status === 'sleeping' ? 'text-blue-600' : 
+                           process.status === 'stopped' ? 'text-red-600' : 'text-gray-600';
+        
+        // 检查是否为系统关键进程（避免误杀）
+        const isSystemProcess = process.pid <= 100 || 
+                               ['kernel_task', 'launchd', 'systemd', 'init'].includes(process.name);
+        
+        html += `
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${process.pid}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${process.name}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${(typeof process.cpu_percent === 'number' ? process.cpu_percent.toFixed(1) : '0.0')}%</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${(typeof process.memory_percent === 'number' ? process.memory_percent.toFixed(1) : '0.0')}%</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm ${statusColor}">${process.status}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${new Date(process.create_time).toLocaleString()}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <div class="flex space-x-2">
+                        <button onclick="showProcessInfo(${process.pid})" 
+                                class="text-blue-600 hover:text-blue-800 text-xs px-2 py-1 rounded border border-blue-300 hover:bg-blue-50">
+                            详情
+                        </button>
+                        ${!isSystemProcess ? `
+                            <button onclick="stopProcess(${process.pid}, '${process.name}')" 
+                                    class="text-yellow-600 hover:text-yellow-800 text-xs px-2 py-1 rounded border border-yellow-300 hover:bg-yellow-50">
+                                停止
+                            </button>
+                            <button onclick="killProcess(${process.pid}, '${process.name}')" 
+                                    class="text-red-600 hover:text-red-800 text-xs px-2 py-1 rounded border border-red-300 hover:bg-red-50">
+                                强制终止
+                            </button>
+                        ` : `
+                            <span class="text-gray-400 text-xs">系统进程</span>
+                        `}
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+    
+    tbody.innerHTML = html;
+    
+    // 更新分页信息
+    updatePagination(data);
+}
+
+// 更新分页控件
+function updatePagination(data) {
+    const start = (data.page - 1) * data.limit + 1;
+    const end = Math.min(start + data.limit - 1, data.total);
+    
+    setText('processes-start', data.total > 0 ? start : 0);
+    setText('processes-end', end);
+    setText('processes-total', data.total);
+    setText('current-page', data.page);
+    setText('total-pages', data.total_pages);
+    
+    // 更新按钮状态
+    const prevButton = document.getElementById('prev-page');
+    const nextButton = document.getElementById('next-page');
+    
+    if (prevButton) {
+        prevButton.disabled = !data.has_prev;
+        if (!data.has_prev) {
+            prevButton.classList.add('opacity-50', 'cursor-not-allowed');
+        } else {
+            prevButton.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    }
+    
+    if (nextButton) {
+        nextButton.disabled = !data.has_next;
+        if (!data.has_next) {
+            nextButton.classList.add('opacity-50', 'cursor-not-allowed');
+        } else {
+            nextButton.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    }
+}
+
+// 更新进度条
+function updateProgress(elementId, percentage) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        const circumference = 2 * Math.PI * 15.9155; // 圆的周长
+        const offset = circumference - (percentage / 100) * circumference;
+        element.style.strokeDasharray = `${circumference} ${circumference}`;
+        element.style.strokeDashoffset = offset;
+    }
+}
+
+// 显示提示消息
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `fixed top-4 left-1/2 z-50 px-6 py-3 rounded-lg text-white shadow-lg ${type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500'}`;
+    toast.style.transform = 'translateX(-50%)';
+    toast.style.transition = 'none';
+    toast.textContent = message;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        document.body.removeChild(toast);
+    }, 3000);
+}
+
+// 进程操作函数
+async function stopProcess(pid, processName) {
+    if (!confirm(`确定要停止进程 ${processName} (PID: ${pid}) 吗？`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/system/processes/${pid}/stop`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast(`进程 ${processName} 已停止`, 'success');
+            // 刷新进程列表
+            setTimeout(() => {
+                loadProcesses(true);
+            }, 1000);
+    } else {
+            showToast(`停止进程失败: ${result.detail}`, 'error');
+        }
+    } catch (error) {
+        console.error('停止进程失败:', error);
+        showToast('停止进程失败: 网络错误', 'error');
+    }
+}
+
+async function killProcess(pid, processName) {
+    if (!confirm(`确定要强制终止进程 ${processName} (PID: ${pid}) 吗？\n\n⚠️ 警告：强制终止可能导致数据丢失！`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/system/processes/${pid}/kill`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast(`进程 ${processName} 已被强制终止`, 'success');
+            // 刷新进程列表
+            setTimeout(() => {
+                loadProcesses(true);
+            }, 1000);
+        } else {
+            showToast(`强制终止进程失败: ${result.detail}`, 'error');
+        }
+    } catch (error) {
+        console.error('强制终止进程失败:', error);
+        showToast('强制终止进程失败: 网络错误', 'error');
+    }
+}
+
+async function showProcessInfo(pid) {
+    try {
+        const response = await fetch(`/api/system/processes/${pid}/info`);
+        
+        if (response.ok) {
+            const processInfo = await response.json();
+            showProcessInfoModal(processInfo);
+        } else {
+            const error = await response.json();
+            showToast(`获取进程信息失败: ${error.detail}`, 'error');
+        }
+    } catch (error) {
+        console.error('获取进程信息失败:', error);
+        showToast('获取进程信息失败: 网络错误', 'error');
+    }
+}
+
+function showProcessInfoModal(processInfo) {
+    // 创建模态框
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50';
+    modal.id = 'process-info-modal';
+    
+    const memoryRss = (processInfo.memory_info.rss / (1024 * 1024)).toFixed(2);
+    const memoryVms = (processInfo.memory_info.vms / (1024 * 1024)).toFixed(2);
+    
+    modal.innerHTML = `
+        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-medium text-gray-900">进程详细信息</h3>
+                    <button onclick="closeProcessInfoModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><strong>PID:</strong> ${processInfo.pid}</div>
+                        <div><strong>进程名:</strong> ${processInfo.name}</div>
+                        <div><strong>状态:</strong> <span class="text-${processInfo.status === 'running' ? 'green' : 'red'}-600">${processInfo.status}</span></div>
+                        <div><strong>CPU使用率:</strong> ${processInfo.cpu_percent?.toFixed(1) || '0.0'}%</div>
+                        <div><strong>内存使用率:</strong> ${processInfo.memory_percent?.toFixed(1) || '0.0'}%</div>
+                        <div><strong>内存RSS:</strong> ${memoryRss} MB</div>
+                        <div><strong>内存VMS:</strong> ${memoryVms} MB</div>
+                        <div><strong>线程数:</strong> ${processInfo.num_threads}</div>
+                        ${processInfo.num_fds ? `<div><strong>文件描述符:</strong> ${processInfo.num_fds}</div>` : ''}
+                    </div>
+                    ${processInfo.exe ? `<div><strong>可执行文件:</strong> ${processInfo.exe}</div>` : ''}
+                    ${processInfo.cmdline && processInfo.cmdline.length > 0 ? 
+                        `<div><strong>命令行:</strong> <code class="text-xs bg-gray-100 p-1 rounded">${processInfo.cmdline.join(' ')}</code></div>` : ''}
+                    ${processInfo.connections && processInfo.connections.length > 0 ? 
+                        `<div><strong>网络连接:</strong> ${processInfo.connections.length} 个连接</div>` : ''}
+                    <div><strong>创建时间:</strong> ${new Date(processInfo.create_time).toLocaleString()}</div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+function closeProcessInfoModal() {
+    const modal = document.getElementById('process-info-modal');
+    if (modal) {
+        document.body.removeChild(modal);
+    }
+}
+</script>
+{% endblock %} 
