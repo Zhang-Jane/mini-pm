@@ -120,7 +120,10 @@ class TaskResponse(BaseModel):
     last_error: Optional[str]
     last_run: Optional[float]
     duration: Optional[str]
+    run_count: Optional[int] = 0  # 累计运行次数
     output: Optional[List[str]]
+    error_detail: Optional[str] = None  # 错误详情
+    error_timestamp: Optional[str] = None  # 错误时间戳
 
 class SystemStatus(BaseModel):
     total_tasks: int
@@ -396,7 +399,10 @@ async def get_tasks() -> List[TaskResponse]:
             last_error=status.get("last_error"),
             last_run=status.get("last_run"),
             duration=status.get("duration"),
-            output=status.get("output", [])
+            run_count=status.get("run_count", 0),
+            output=status.get("output", []),
+            error_detail=status.get("error_detail"),
+            error_timestamp=status.get("error_timestamp")
         ))
     
     return result

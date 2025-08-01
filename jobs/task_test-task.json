@@ -1,7 +1,0 @@
-{
-    "id": "test-task",
-    "script_path": "test_script.py",
-    "interval_minutes": 15,
-    "enabled": false,
-    "execute_path": "python3"
-}

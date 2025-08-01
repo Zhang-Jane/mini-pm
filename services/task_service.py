@@ -174,38 +174,56 @@ class TaskService:
                 # 任务成功
                 get_log_manager().log_task_success(task_id, script_path, duration)
                 async with self.task_lock:
+                    current_status = self.task_status.get(task_id, {})
+                    run_count = current_status.get("run_count", 0) + 1
                     self.task_status[task_id] = {
                         "status": "SUCCESS", 
                         "last_success": end_time_str,
                         "last_run": time.time(),
                         "duration": f"{duration:.2f}秒",
+                        "run_count": run_count,
                         "output": output_lines[-10:] if output_lines else []  # 保留最后10行输出
                     }
             else:
                 # 任务失败
                 error_msg = f"退出码 {return_code}"
+                error_detail = f"任务执行失败 - 脚本: {script_path}, 退出码: {return_code}"
+                if output_lines:
+                    error_detail += f"\n\n输出内容:\n" + "\n".join(output_lines[-20:])  # 保留最后20行输出
+                
                 get_log_manager().log_task_failure(task_id, script_path, error_msg, return_code)
                 async with self.task_lock:
+                    current_status = self.task_status.get(task_id, {})
+                    run_count = current_status.get("run_count", 0) + 1
                     self.task_status[task_id] = {
                         "status": "FAILED", 
                         "last_error": error_msg,
                         "last_run": time.time(),
                         "duration": f"{duration:.2f}秒",
-                        "output": output_lines[-10:] if output_lines else []
+                        "run_count": run_count,
+                        "output": output_lines[-10:] if output_lines else [],
+                        "error_detail": error_detail,
+                        "error_timestamp": end_time.strftime('%Y-%m-%d %H:%M:%S')
                     }
 
         except Exception as e:
             # 任务异常
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
+            error_detail = f"任务执行异常 - 脚本: {script_path}, 异常: {str(e)}"
             get_log_manager().log_task_exception(task_id, script_path, e)
             async with self.task_lock:
+                current_status = self.task_status.get(task_id, {})
+                run_count = current_status.get("run_count", 0) + 1
                 self.task_status[task_id] = {
                     "status": "EXCEPTION", 
                     "last_error": str(e),
                     "last_run": time.time(),
                     "duration": f"{duration:.2f}秒",
-                    "output": []
+                    "run_count": run_count,
+                    "output": [],
+                    "error_detail": error_detail,
+                    "error_timestamp": end_time.strftime('%Y-%m-%d %H:%M:%S')
                 }
 
         finally:
