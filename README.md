@@ -39,6 +39,7 @@ task_web/
 │   ├── dashboard.html      # 仪表板
 │   ├── tasks.html          # 任务管理
 │   ├── logs.html           # 日志查看
+│   ├── terminal.html       # 终端管理
 │   └── settings.html       # 系统设置
 ├── static/                 # 静态资源
 │   ├── css/
@@ -97,7 +98,27 @@ task_web/
 - ✅ **系统导出**: 导出完整系统状态
 - ✅ **多格式支持**: JSON、CSV 等格式
 
-### 7. 配置管理
+### 7. 终端管理 🆕
+
+- ✅ **跨平台支持**: 支持 Windows、Linux、macOS
+- ✅ **多会话管理**: 创建和管理多个终端会话
+- ✅ **实时命令执行**: 支持任意命令的实时执行
+- ✅ **系统监控**: 实时系统资源监控
+- ✅ **进程管理**: 系统进程查看和控制
+- ✅ **预设命令**: 常用系统命令快速执行
+- ✅ **安全控制**: 危险命令过滤和权限控制
+- ✅ **WebSocket 通信**: 实时终端输出和交互
+
+### 8. 配置管理
+
+### 9. 终端管理
+
+- ✅ **多终端支持**: 支持创建多个终端会话
+- ✅ **跨平台支持**: Windows、Linux、macOS 全平台支持
+- ✅ **安全防护**: 禁止执行危险命令，超时保护
+- ✅ **快速命令**: 常用命令一键执行
+- ✅ **实时监控**: 系统资源实时监控
+- ✅ **Web 界面**: 基于 Web 的终端管理界面
 
 - ✅ **热重载**: 配置更改无需重启
 - ✅ **存储切换**: 支持运行时切换存储后端
@@ -266,6 +287,34 @@ curl http://localhost:8100/api/status
 # 浏览器打开: http://localhost:8100
 ```
 
+### 5. 功能验证
+
+#### 基础功能测试
+
+```bash
+# 测试任务管理
+curl http://localhost:8100/api/tasks
+
+# 测试日志查看
+curl http://localhost:8100/api/logs
+
+# 测试系统状态
+curl http://localhost:8100/api/status
+
+# 测试终端管理
+curl http://localhost:8100/api/terminal/system-info
+```
+
+#### Web 界面测试
+
+- 访问仪表板: http://localhost:8100
+- 访问任务管理: http://localhost:8100/tasks
+- 访问日志查看: http://localhost:8100/logs
+- 访问终端管理: http://localhost:8100/terminal
+- 访问系统设置: http://localhost:8100/settings
+
+````
+
 ### 4. 启动检查清单
 
 #### 开发环境检查
@@ -311,7 +360,7 @@ docker run -d -p 8100:8100 --name mini-pm2 mini-pm2
 
 # 或使用 docker-compose
 docker-compose up -d
-```
+````
 
 #### 系统服务部署
 

@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图表测试</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-2xl font-bold mb-6">图表功能测试</h1>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- CPU使用率图表 -->
+            <div>
+                <h4 class="text-sm font-medium text-gray-700 mb-3">CPU使用率趋势</h4>
+                <div class="h-32 bg-gray-50 rounded-lg flex items-center justify-center" id="cpu-chart">
+                    <div class="text-center text-gray-500">
+                        <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                        <p class="text-sm">图表加载中...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 内存使用率图表 -->
+            <div>
+                <h4 class="text-sm font-medium text-gray-700 mb-3">内存使用率趋势</h4>
+                <div class="h-32 bg-gray-50 rounded-lg flex items-center justify-center" id="memory-chart">
+                    <div class="text-center text-gray-500">
+                        <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                        <p class="text-sm">图表加载中...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-6">
+            <button onclick="testCharts()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                测试图表
+            </button>
+            <button onclick="loadRealData()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 ml-2">
+                加载真实数据
+            </button>
+        </div>
+        
+        <div id="debug" class="mt-4 p-4 bg-gray-200 rounded text-sm font-mono"></div>
+    </div>
+
+    <script>
+        function log(message) {
+            const debug = document.getElementById('debug');
+            debug.innerHTML += new Date().toLocaleTimeString() + ': ' + message + '<br>';
+            console.log(message);
+        }
+        
+        // 生成模拟数据
+        function generateRealisticCPUData(points, baseValue = null) {
+            const data = [];
+            if (baseValue === null) {
+                baseValue = 35 + Math.random() * 25;
+            }
+            
+            for (let i = 0; i < points; i++) {
+                const randomFactor = 0.8 + Math.random() * 0.4;
+                const trendFactor = 1 + Math.sin(i * 0.3) * 0.15;
+                const value = Math.min(100, Math.max(15, baseValue * randomFactor * trendFactor));
+                data.push(Math.round(value));
+                baseValue += (Math.random() - 0.5) * 2;
+                baseValue = Math.max(20, Math.min(65, baseValue));
+            }
+            return data;
+        }
+        
+        function generateRealisticMemoryData(points, baseValue = null) {
+            const data = [];
+            if (baseValue === null) {
+                baseValue = 55 + Math.random() * 25;
+            }
+            
+            for (let i = 0; i < points; i++) {
+                const randomFactor = 0.9 + Math.random() * 0.2;
+                const trendFactor = 1 + Math.sin(i * 0.2) * 0.08;
+                const value = Math.min(100, Math.max(35, baseValue * randomFactor * trendFactor));
+                data.push(Math.round(value));
+                baseValue += (Math.random() - 0.5) * 1.2;
+                baseValue = Math.max(40, Math.min(85, baseValue));
+            }
+            return data;
+        }
+        
+        function getTimeLabels(points) {
+            const labels = [];
+            const now = new Date();
+            
+            for (let i = 0; i < points; i++) {
+                const hourOffset = points - 1 - i;
+                const targetTime = new Date(now.getTime() - hourOffset * 60 * 60 * 1000);
+                const hour = targetTime.getHours();
+                
+                if (i === 0 || i === points - 1 || hour % 6 === 0) {
+                    labels.push(`${hour.toString().padStart(2, '0')}:00`);
+                } else {
+                    labels.push('');
+                }
+            }
+            return labels;
+        }
+        
+        function updateCPUChart(data) {
+            log('更新CPU图表');
+            const cpuChartContainer = document.getElementById('cpu-chart');
+            
+            let cpuData;
+            if (data && data.cpu && data.cpu.percent !== undefined) {
+                const baseValue = data.cpu.percent;
+                cpuData = generateRealisticCPUData(24, baseValue);
+                log('使用真实CPU数据，基础值: ' + baseValue);
+            } else {
+                cpuData = generateRealisticCPUData(24);
+                log('使用模拟CPU数据');
+            }
+            
+            const maxValue = Math.max(...cpuData);
+            const minValue = Math.min(...cpuData);
+            const avgValue = cpuData.reduce((a, b) => a + b, 0) / cpuData.length;
+            const timeLabels = getTimeLabels(24);
+            
+            log('CPU数据范围: ' + JSON.stringify({ min: minValue, max: maxValue, avg: Math.round(avgValue) }));
+            
+            cpuChartContainer.innerHTML = `
+                <div class="w-full h-full p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
+                            <span class="text-sm font-medium text-gray-700">CPU使用率</span>
+                        </div>
+                        <div class="text-xs text-gray-500">
+                            <span class="font-medium text-blue-600">${Math.round(avgValue)}%</span> 平均
+                        </div>
+                    </div>
+                    
+                    <div class="relative h-32 mb-3">
+                        <div class="absolute inset-0 grid grid-cols-6 gap-1">
+                            ${Array.from({length: 6}, () => '<div class="border-r border-gray-100"></div>').join('')}
+                        </div>
+                        <div class="absolute inset-0 grid grid-rows-4 gap-1">
+                            ${Array.from({length: 4}, () => '<div class="border-b border-gray-100"></div>').join('')}
+                        </div>
+                        
+                        <div class="relative h-full flex items-end justify-between gap-1">
+                            ${cpuData.map((value, index) => {
+                                const height = Math.max((value / 100) * 100, 8);
+                                const opacity = 0.6 + (value / 100) * 0.4;
+                                const isHighUsage = value > 80;
+                                const isMediumUsage = value > 60;
+                                
+                                let colorClass = 'from-blue-500 to-blue-400 hover:from-blue-600 hover:to-blue-500';
+                                if (isHighUsage) {
+                                    colorClass = 'from-red-500 to-red-400 hover:from-red-600 hover:to-red-500';
+                                } else if (isMediumUsage) {
+                                    colorClass = 'from-yellow-500 to-yellow-400 hover:from-yellow-600 hover:to-yellow-500';
+                                }
+                                
+                                return `
+                                    <div class="flex-1 relative group">
+                                        <div class="bg-gradient-to-t ${colorClass} rounded-t transition-all duration-300" 
+                                             style="height: ${height}%; opacity: ${opacity};" 
+                                             title="CPU: ${Math.round(value)}% (${timeLabels[index]})">
+                                            <div class="absolute inset-0 bg-white opacity-20 rounded-t"></div>
+                                        </div>
+                                        <div class="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                                            ${Math.round(value)}%
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-between text-xs text-gray-400 mt-1">
+                        ${timeLabels.map((label, index) => 
+                            label ? `<span class="text-center">${label}</span>` : '<span></span>'
+                        ).join('')}
+                    </div>
+                    
+                    <div class="flex justify-between text-xs text-gray-500 mt-2">
+                        <div class="flex items-center gap-1">
+                            <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
+                            <span>最大值: ${Math.round(maxValue)}%</span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="w-2 h-2 bg-blue-400 rounded-full"></span>
+                            <span>最小值: ${Math.round(minValue)}%</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            log('CPU图表更新完成');
+        }
+        
+        function updateMemoryChart(data) {
+            log('更新内存图表');
+            const memoryChartContainer = document.getElementById('memory-chart');
+            
+            let memoryData;
+            if (data && data.memory && data.memory.percent !== undefined) {
+                const baseValue = data.memory.percent;
+                memoryData = generateRealisticMemoryData(24, baseValue);
+                log('使用真实内存数据，基础值: ' + baseValue);
+            } else {
+                memoryData = generateRealisticMemoryData(24);
+                log('使用模拟内存数据');
+            }
+            
+            const maxValue = Math.max(...memoryData);
+            const minValue = Math.min(...memoryData);
+            const avgValue = memoryData.reduce((a, b) => a + b, 0) / memoryData.length;
+            const timeLabels = getTimeLabels(24);
+            
+            log('内存数据范围: ' + JSON.stringify({ min: minValue, max: maxValue, avg: Math.round(avgValue) }));
+            
+            memoryChartContainer.innerHTML = `
+                <div class="w-full h-full p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                            <span class="text-sm font-medium text-gray-700">内存使用率</span>
+                        </div>
+                        <div class="text-xs text-gray-500">
+                            <span class="font-medium text-green-600">${Math.round(avgValue)}%</span> 平均
+                        </div>
+                    </div>
+                    
+                    <div class="relative h-32 mb-3">
+                        <div class="absolute inset-0 grid grid-cols-6 gap-1">
+                            ${Array.from({length: 6}, () => '<div class="border-r border-gray-100"></div>').join('')}
+                        </div>
+                        <div class="absolute inset-0 grid grid-rows-4 gap-1">
+                            ${Array.from({length: 4}, () => '<div class="border-b border-gray-100"></div>').join('')}
+                        </div>
+                        
+                        <div class="relative h-full flex items-end justify-between gap-1">
+                            ${memoryData.map((value, index) => {
+                                const height = Math.max((value / 100) * 100, 8);
+                                const opacity = 0.6 + (value / 100) * 0.4;
+                                const isHighUsage = value > 80;
+                                const isMediumUsage = value > 60;
+                                
+                                let colorClass = 'from-green-500 to-green-400 hover:from-green-600 hover:to-green-500';
+                                if (isHighUsage) {
+                                    colorClass = 'from-red-500 to-red-400 hover:from-red-600 hover:to-red-500';
+                                } else if (isMediumUsage) {
+                                    colorClass = 'from-yellow-500 to-yellow-400 hover:from-yellow-600 hover:to-yellow-500';
+                                }
+                                
+                                return `
+                                    <div class="flex-1 relative group">
+                                        <div class="bg-gradient-to-t ${colorClass} rounded-t transition-all duration-300" 
+                                             style="height: ${height}%; opacity: ${opacity};" 
+                                             title="内存: ${Math.round(value)}% (${timeLabels[index]})">
+                                            <div class="absolute inset-0 bg-white opacity-20 rounded-t"></div>
+                                        </div>
+                                        <div class="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                                            ${Math.round(value)}%
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-between text-xs text-gray-400 mt-1">
+                        ${timeLabels.map((label, index) => 
+                            label ? `<span class="text-center">${label}</span>` : '<span></span>'
+                        ).join('')}
+                    </div>
+                    
+                    <div class="flex justify-between text-xs text-gray-500 mt-2">
+                        <div class="flex items-center gap-1">
+                            <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+                            <span>最大值: ${Math.round(maxValue)}%</span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="w-2 h-2 bg-green-400 rounded-full"></span>
+                            <span>最小值: ${Math.round(minValue)}%</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            log('内存图表更新完成');
+        }
+        
+        function testCharts() {
+            log('开始测试图表功能');
+            updateCPUChart({});
+            updateMemoryChart({});
+        }
+        
+        async function loadRealData() {
+            log('开始加载真实数据');
+            try {
+                const response = await fetch('/api/monitoring/metrics');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                const data = await response.json();
+                log('获取到的监控数据: ' + JSON.stringify(data));
+                
+                updateCPUChart(data);
+                updateMemoryChart(data);
+                
+                log('真实数据加载完成');
+            } catch (error) {
+                log('加载真实数据失败: ' + error.message);
+                // 即使API失败，也尝试显示模拟数据
+                updateCPUChart({});
+                updateMemoryChart({});
+            }
+        }
+        
+        // 页面加载完成后自动测试
+        document.addEventListener('DOMContentLoaded', function() {
+            log('页面加载完成');
+            setTimeout(() => {
+                testCharts();
+            }, 500);
+        });
+    </script>
+</body>
+</html> 

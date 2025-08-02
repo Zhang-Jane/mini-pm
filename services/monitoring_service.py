@@ -46,11 +46,14 @@ class MonitoringService:
     async def start(self):
         """启动监控服务"""
         if not self.enabled:
+            print("⚠️ 监控服务已禁用")
             return
         
         self.is_running = True
         self.monitoring_task = asyncio.create_task(self._monitoring_loop())
         print("✅ 系统监控服务已启动")
+        print(f"📊 监控间隔: {self.interval}秒")
+        print(f"📈 最大历史记录: {self.max_history_size}条")
     
     async def stop(self):
         """停止监控服务"""
@@ -65,15 +68,18 @@ class MonitoringService:
     
     async def _monitoring_loop(self):
         """监控主循环"""
+        print("🔄 监控循环已启动")
         while self.is_running:
             try:
                 metrics = self._collect_metrics()
                 self._store_metrics(metrics)
+                print(f"📊 已收集监控数据: CPU={metrics.cpu_percent:.1f}%, 内存={metrics.memory_percent:.1f}%")
                 await asyncio.sleep(self.interval)
             except asyncio.CancelledError:
+                print("🛑 监控循环已取消")
                 break
             except Exception as e:
-                print(f"监控服务错误: {e}")
+                print(f"❌ 监控服务错误: {e}")
                 await asyncio.sleep(5)
     
     def _collect_metrics(self) -> SystemMetrics:

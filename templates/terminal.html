@@ -1,0 +1,705 @@
+{% extends "base.html" %}
+
+{% block title %}终端管理 - Mini PM2{% endblock %}
+{% block page_title %}终端管理{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- 顶部控制面板 -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900">终端控制面板</h2>
+            <div class="flex items-center gap-2">
+                <button id="new-terminal"
+                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                    <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    新建终端
+                </button>
+                <button id="clear-terminal"
+                    class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors">
+                    <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                        </path>
+                    </svg>
+                    清空终端
+                </button>
+                <button id="close-all"
+                    class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                    <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                        </path>
+                    </svg>
+                    关闭所有
+                </button>
+            </div>
+        </div>
+
+        <!-- 快速命令输入 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-gray-700">快速命令:</label>
+                <select id="quick-command"
+                    class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">选择预设命令</option>
+                    <option value="pwd">显示当前目录</option>
+                    <option value="ls -la">列出文件</option>
+                    <option value="ps aux">查看进程</option>
+                    <option value="df -h">磁盘使用情况</option>
+                    <option value="free -h">内存使用情况</option>
+                    <option value="top">系统监控</option>
+                    <option value="whoami">当前用户</option>
+                    <option value="date">当前时间</option>
+                    <option value="uname -a">系统信息</option>
+                </select>
+            </div>
+            <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-gray-700">自定义命令:</label>
+                <input type="text" id="custom-command" placeholder="输入命令..."
+                    class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="execute-command"
+                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    执行命令
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 终端标签页 -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div id="terminal-tabs" class="flex border-b border-gray-200">
+            <!-- 标签页将在这里动态生成 -->
+        </div>
+
+        <!-- 终端容器 -->
+        <div id="terminal-container" class="relative p-4">
+            <!-- xterm终端将在这里渲染 -->
+        </div>
+    </div>
+
+    <!-- 系统信息面板 -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">系统信息</h2>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-gray-50 rounded-lg p-4">
+                <div class="flex items-center gap-2 mb-2">
+                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z">
+                        </path>
+                    </svg>
+                    <span class="font-medium text-gray-700">CPU使用率</span>
+                </div>
+                <div class="text-2xl font-bold text-gray-900" id="cpu-usage">--</div>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-4">
+                <div class="flex items-center gap-2 mb-2">
+                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2H9a2 2 0 00-2 2v10a2 2 0 002 2z">
+                        </path>
+                    </svg>
+                    <span class="font-medium text-gray-700">内存使用率</span>
+                </div>
+                <div class="text-2xl font-bold text-gray-900" id="memory-usage">--</div>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-4">
+                <div class="flex items-center gap-2 mb-2">
+                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4">
+                        </path>
+                    </svg>
+                    <span class="font-medium text-gray-700">磁盘使用率</span>
+                </div>
+                <div class="text-2xl font-bold text-gray-900" id="disk-usage">--</div>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-4">
+                <div class="flex items-center gap-2 mb-2">
+                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span class="font-medium text-gray-700">活跃会话</span>
+                </div>
+                <div class="text-2xl font-bold text-gray-900" id="active-sessions">--</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- xterm.js -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.min.js"></script>
+
+<style>
+/* 终端样式优化 */
+.terminal-instance {
+    background-color: #1e1e1e;
+    border-radius: 0.375rem;
+    overflow: hidden;
+}
+
+.terminal-instance .xterm {
+    padding: 0.5rem;
+}
+
+.terminal-instance .xterm-viewport {
+    background-color: #1e1e1e;
+}
+
+.terminal-instance .xterm-screen {
+    background-color: #1e1e1e;
+}
+
+/* 确保终端字体正确显示 */
+.xterm {
+    font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace !important;
+    font-size: 14px !important;
+    line-height: 1.2 !important;
+    color: #ffffff !important;
+}
+
+/* 修复可能的字符编码问题 */
+.xterm-char {
+    font-family: inherit !important;
+}
+
+/* 确保ANSI颜色正确显示 */
+.xterm .xterm-color-0 { color: #000000 !important; }
+.xterm .xterm-color-1 { color: #cd3131 !important; }
+.xterm .xterm-color-2 { color: #0dbc79 !important; }
+.xterm .xterm-color-3 { color: #e5e510 !important; }
+.xterm .xterm-color-4 { color: #2472c8 !important; }
+.xterm .xterm-color-5 { color: #bc3fbc !important; }
+.xterm .xterm-color-6 { color: #11a8cd !important; }
+.xterm .xterm-color-7 { color: #e5e5e5 !important; }
+.xterm .xterm-color-8 { color: #666666 !important; }
+.xterm .xterm-color-9 { color: #f14c4c !important; }
+.xterm .xterm-color-10 { color: #23d18b !important; }
+.xterm .xterm-color-11 { color: #f5f543 !important; }
+.xterm .xterm-color-12 { color: #3b8eea !important; }
+.xterm .xterm-color-13 { color: #d670d6 !important; }
+.xterm .xterm-color-14 { color: #29b8db !important; }
+.xterm .xterm-color-15 { color: #ffffff !important; }
+
+/* 修复光标显示 */
+.xterm-cursor {
+    background-color: #ffffff !important;
+}
+</style>
+
+<script>
+    class IntegratedTerminalManager {
+        constructor() {
+            this.terminals = new Map(); // 存储所有终端实例
+            this.activeTerminalId = null;
+            this.terminalCounter = 0;
+            this.init();
+        }
+
+        init() {
+            this.bindEvents();
+            this.loadSystemInfo();
+            this.startSystemMonitoring();
+            // 自动创建第一个终端
+            this.createTerminal();
+        }
+
+        bindEvents() {
+            // 新建终端按钮
+            document.getElementById('new-terminal').addEventListener('click', () => {
+                this.createTerminal();
+            });
+
+            // 清空终端按钮
+            document.getElementById('clear-terminal').addEventListener('click', () => {
+                this.clearActiveTerminal();
+            });
+
+            // 关闭所有按钮
+            document.getElementById('close-all').addEventListener('click', () => {
+                this.closeAllTerminals();
+            });
+
+            // 快速命令选择
+            document.getElementById('quick-command').addEventListener('change', (e) => {
+                if (e.target.value) {
+                    document.getElementById('custom-command').value = e.target.value;
+                    e.target.value = ''; // 重置选择
+                }
+            });
+
+            // 执行命令按钮
+            document.getElementById('execute-command').addEventListener('click', () => {
+                this.executeCommand();
+            });
+
+            // 自定义命令输入框回车事件
+            document.getElementById('custom-command').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.executeCommand();
+                }
+            });
+        }
+
+        createTerminal() {
+            this.terminalCounter++;
+            const terminalId = `terminal_${this.terminalCounter}`;
+            const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+            // 创建标签页
+            this.createTab(terminalId, sessionId);
+
+            // 创建终端实例
+            const terminal = new Terminal({
+                cursorBlink: true,
+                fontSize: 14,
+                fontFamily: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
+                theme: {
+                    background: '#1e1e1e',
+                    foreground: '#ffffff',
+                    cursor: '#ffffff',
+                    selection: '#264f78',
+                    black: '#000000',
+                    red: '#cd3131',
+                    green: '#0dbc79',
+                    yellow: '#e5e510',
+                    blue: '#2472c8',
+                    magenta: '#bc3fbc',
+                    cyan: '#11a8cd',
+                    white: '#e5e5e5',
+                    brightBlack: '#666666',
+                    brightRed: '#f14c4c',
+                    brightGreen: '#23d18b',
+                    brightYellow: '#f5f543',
+                    brightBlue: '#3b8eea',
+                    brightMagenta: '#d670d6',
+                    brightCyan: '#29b8db',
+                    brightWhite: '#ffffff'
+                },
+                rows: 25,
+                cols: 80,
+                allowTransparency: true,
+                scrollback: 1000,
+                convertEol: true,
+                rendererType: 'canvas',
+                windowsMode: true,
+                macOptionIsMeta: true,
+                macOptionClickForcesSelection: true,
+                rightClickSelectsWord: true,
+                fastScrollModifier: 'alt',
+                fastScrollSensitivity: 5,
+                scrollback: 1000,
+                scrollSensitivity: 1,
+                scrollOnUserInput: false
+            });
+
+            // 创建终端容器
+            const terminalContainer = document.createElement('div');
+            terminalContainer.id = `terminal-${terminalId}`;
+            terminalContainer.className = 'terminal-instance';
+            terminalContainer.style.display = 'none';
+            terminalContainer.style.height = '500px';
+            terminalContainer.style.width = '100%';
+
+            document.getElementById('terminal-container').appendChild(terminalContainer);
+
+            // 打开终端
+            terminal.open(terminalContainer);
+
+            // 添加插件
+            const fitAddon = new FitAddon.FitAddon();
+            const webLinksAddon = new WebLinksAddon.WebLinksAddon();
+            terminal.loadAddon(fitAddon);
+            terminal.loadAddon(webLinksAddon);
+            fitAddon.fit();
+
+            // 存储终端信息
+            this.terminals.set(terminalId, {
+                terminal: terminal,
+                sessionId: sessionId,
+                websocket: null,
+                isConnected: false,
+                container: terminalContainer,
+                fitAddon: fitAddon,
+                commandHistory: [],
+                historyIndex: -1
+            });
+
+            // 激活这个终端
+            this.activateTerminal(terminalId);
+
+            // 连接WebSocket
+            this.connectWebSocket(terminalId, sessionId);
+
+            return terminalId;
+        }
+
+        createTab(terminalId, sessionId) {
+            const tabsContainer = document.getElementById('terminal-tabs');
+
+            const tab = document.createElement('div');
+            tab.className = 'flex items-center px-4 py-2 bg-gray-100 border-r border-gray-200 cursor-pointer hover:bg-gray-200 transition-colors';
+            tab.setAttribute('data-terminal-id', terminalId);
+
+            tab.innerHTML = `
+            <span class="text-sm font-medium">终端 ${this.terminalCounter}</span>
+            <button class="ml-2 text-gray-500 hover:text-red-600 transition-colors" onclick="terminalManager.closeTerminal('${terminalId}')">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        `;
+
+            tab.addEventListener('click', () => {
+                this.activateTerminal(terminalId);
+            });
+
+            tabsContainer.appendChild(tab);
+        }
+
+        activateTerminal(terminalId) {
+            // 隐藏所有终端
+            this.terminals.forEach((terminalInfo, id) => {
+                terminalInfo.container.style.display = 'none';
+            });
+
+            // 移除所有标签页的激活状态
+            document.querySelectorAll('#terminal-tabs > div').forEach(tab => {
+                tab.classList.remove('bg-blue-100', 'border-blue-300');
+                tab.classList.add('bg-gray-100', 'border-gray-200');
+            });
+
+            // 显示选中的终端
+            const terminalInfo = this.terminals.get(terminalId);
+            if (terminalInfo) {
+                terminalInfo.container.style.display = 'block';
+                terminalInfo.fitAddon.fit();
+                terminalInfo.terminal.focus();
+
+                // 激活对应的标签页
+                const tab = document.querySelector(`[data-terminal-id="${terminalId}"]`);
+                if (tab) {
+                    tab.classList.remove('bg-gray-100', 'border-gray-200');
+                    tab.classList.add('bg-blue-100', 'border-blue-300');
+                }
+
+                this.activeTerminalId = terminalId;
+            }
+        }
+
+        connectWebSocket(terminalId, sessionId) {
+            const terminalInfo = this.terminals.get(terminalId);
+            if (!terminalInfo) return;
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/terminal/${sessionId}`;
+
+            const websocket = new WebSocket(wsUrl);
+
+            websocket.onopen = () => {
+                terminalInfo.isConnected = true;
+                terminalInfo.websocket = websocket;
+                terminalInfo.terminal.write('\r\n');
+                terminalInfo.terminal.write('\x1B[1;32m✅ 终端连接成功\x1B[0m\r\n');
+                terminalInfo.terminal.write(`\x1B[1;36m会话ID: ${sessionId}\x1B[0m\r\n`);
+                terminalInfo.terminal.write('\r\n');
+                
+                // 发送初始化命令来清理环境
+                setTimeout(() => {
+                    if (websocket.readyState === WebSocket.OPEN) {
+                        websocket.send(JSON.stringify({
+                            type: 'input',
+                            command: 'export TERM=xterm-256color\n'
+                        }));
+                        websocket.send(JSON.stringify({
+                            type: 'input',
+                            command: 'export LANG=en_US.UTF-8\n'
+                        }));
+                        websocket.send(JSON.stringify({
+                            type: 'input',
+                            command: 'export LC_ALL=en_US.UTF-8\n'
+                        }));
+                    }
+                }, 100);
+            };
+
+            websocket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    this.handleWebSocketMessage(terminalId, data);
+                } catch (error) {
+                    console.error('解析WebSocket消息失败:', error);
+                }
+            };
+
+            websocket.onclose = () => {
+                terminalInfo.isConnected = false;
+                terminalInfo.terminal.write('\r\n\x1B[1;31m❌ 终端连接已断开\x1B[0m\r\n');
+            };
+
+            websocket.onerror = (error) => {
+                console.error('WebSocket错误:', error);
+                terminalInfo.terminal.write('\r\n\x1B[1;31m❌ 连接错误\x1B[0m\r\n');
+            };
+
+            // 处理终端输入
+            terminalInfo.terminal.onData((data) => {
+                if (terminalInfo.isConnected && websocket.readyState === WebSocket.OPEN) {
+                    websocket.send(JSON.stringify({
+                        type: 'input',
+                        command: data
+                    }));
+                }
+            });
+
+            // 处理键盘事件
+            terminalInfo.terminal.onKey(({ key, domEvent }) => {
+                if (domEvent && domEvent.key === 'ArrowUp') {
+                    this.navigateHistory(terminalId, 'up');
+                    domEvent.preventDefault();
+                } else if (domEvent && domEvent.key === 'ArrowDown') {
+                    this.navigateHistory(terminalId, 'down');
+                    domEvent.preventDefault();
+                }
+            });
+        }
+
+        handleWebSocketMessage(terminalId, data) {
+            const terminalInfo = this.terminals.get(terminalId);
+            if (!terminalInfo) return;
+
+            switch (data.type) {
+                case 'connection':
+                    if (data.status === 'connected') {
+                        terminalInfo.terminal.write('\r\n');
+                        terminalInfo.terminal.write(`\x1B[1;32m✅ 连接到 ${data.system} 系统\x1B[0m\r\n`);
+                        terminalInfo.terminal.write('\r\n');
+                    }
+                    break;
+                case 'output':
+                    // 处理输出数据，确保正确的换行
+                    let output = data.data;
+                    if (typeof output === 'string') {
+                        // 清理ANSI转义序列中的问题字符
+                        output = this.cleanAnsiOutput(output);
+                        terminalInfo.terminal.write(output);
+                    }
+                    break;
+                case 'error':
+                    terminalInfo.terminal.write('\r\n');
+                    terminalInfo.terminal.write(`\x1B[1;31m错误: ${data.message}\x1B[0m\r\n`);
+                    terminalInfo.terminal.write('\r\n');
+                    break;
+            }
+        }
+
+        // 清理ANSI输出中的问题字符
+        cleanAnsiOutput(output) {
+            if (typeof output !== 'string') return output;
+            
+            let cleaned = output;
+            
+            // 移除不可见的控制字符，但保留ANSI转义序列
+            cleaned = cleaned.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '');
+            
+            // 修复常见的zsh提示符问题
+            cleaned = cleaned.replace(/%\{[^}]+\}/g, ''); // 移除zsh颜色代码
+            cleaned = cleaned.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, (match) => {
+                // 确保ANSI转义序列完整
+                if (match.endsWith('m') || match.endsWith('h') || match.endsWith('l')) {
+                    return match;
+                }
+                return '';
+            });
+            
+            // 修复光标控制序列
+            cleaned = cleaned.replace(/\x1B\[[0-9]*[ABCD]/g, (match) => {
+                // 确保光标移动序列正确
+                return match;
+            });
+            
+            // 修复颜色重置
+            cleaned = cleaned.replace(/\x1B\[0*m/g, '\x1B[0m');
+            
+            // 移除多余的转义序列
+            cleaned = cleaned.replace(/\x1B\[[0-9;]*[^a-zA-Z]/g, '');
+            
+            return cleaned;
+        }
+
+        executeCommand() {
+            const command = document.getElementById('custom-command').value.trim();
+            if (!command) return;
+
+            const terminalInfo = this.terminals.get(this.activeTerminalId);
+            if (!terminalInfo || !terminalInfo.isConnected) {
+                alert('请先连接终端');
+                return;
+            }
+
+            // 添加到命令历史
+            if (command && !terminalInfo.commandHistory.includes(command)) {
+                terminalInfo.commandHistory.push(command);
+            }
+            terminalInfo.historyIndex = -1;
+
+            // 发送命令到终端
+            terminalInfo.terminal.write('\r\n');
+            terminalInfo.terminal.write(`$ ${command}\r\n`);
+            terminalInfo.websocket.send(JSON.stringify({
+                type: 'input',
+                command: command + '\n'
+            }));
+
+            // 清空输入框
+            document.getElementById('custom-command').value = '';
+        }
+
+        navigateHistory(terminalId, direction) {
+            const terminalInfo = this.terminals.get(terminalId);
+            if (!terminalInfo || terminalInfo.commandHistory.length === 0) return;
+
+            if (direction === 'up') {
+                if (terminalInfo.historyIndex < terminalInfo.commandHistory.length - 1) {
+                    terminalInfo.historyIndex++;
+                }
+            } else if (direction === 'down') {
+                if (terminalInfo.historyIndex > 0) {
+                    terminalInfo.historyIndex--;
+                } else if (terminalInfo.historyIndex === 0) {
+                    terminalInfo.historyIndex = -1;
+                }
+            }
+
+            if (terminalInfo.historyIndex >= 0) {
+                const command = terminalInfo.commandHistory[terminalInfo.commandHistory.length - 1 - terminalInfo.historyIndex];
+                // 这里可以实现命令历史回显到输入框
+                document.getElementById('custom-command').value = command;
+            }
+        }
+
+        clearActiveTerminal() {
+            if (this.activeTerminalId) {
+                const terminalInfo = this.terminals.get(this.activeTerminalId);
+                if (terminalInfo) {
+                    terminalInfo.terminal.clear();
+                    terminalInfo.terminal.write('\r\n');
+                    terminalInfo.terminal.write('$ ');
+                }
+            }
+        }
+
+        closeTerminal(terminalId) {
+            const terminalInfo = this.terminals.get(terminalId);
+            if (!terminalInfo) return;
+
+            // 关闭WebSocket连接
+            if (terminalInfo.websocket) {
+                terminalInfo.websocket.close();
+            }
+
+            // 销毁终端实例
+            terminalInfo.terminal.dispose();
+
+            // 移除容器
+            terminalInfo.container.remove();
+
+            // 移除标签页
+            const tab = document.querySelector(`[data-terminal-id="${terminalId}"]`);
+            if (tab) {
+                tab.remove();
+            }
+
+            // 从Map中移除
+            this.terminals.delete(terminalId);
+
+            // 如果关闭的是当前激活的终端，激活下一个
+            if (this.activeTerminalId === terminalId) {
+                const remainingTerminals = Array.from(this.terminals.keys());
+                if (remainingTerminals.length > 0) {
+                    this.activateTerminal(remainingTerminals[0]);
+                } else {
+                    this.activeTerminalId = null;
+                }
+            }
+        }
+
+        closeAllTerminals() {
+            const terminalIds = Array.from(this.terminals.keys());
+            terminalIds.forEach(id => {
+                this.closeTerminal(id);
+            });
+        }
+
+        async loadSystemInfo() {
+            try {
+                const response = await fetch('/api/system/info');
+                const data = await response.json();
+
+                if (data.cpu) {
+                    document.getElementById('cpu-usage').textContent = `${data.cpu.percent}%`;
+                }
+                if (data.memory) {
+                    document.getElementById('memory-usage').textContent = `${data.memory.percent}%`;
+                }
+
+                // 获取磁盘使用率
+                try {
+                    const diskResponse = await fetch('/api/monitoring/metrics');
+                    const diskData = await diskResponse.json();
+                    if (diskData.disk_usage) {
+                        document.getElementById('disk-usage').textContent = diskData.disk_usage;
+                    }
+                } catch (error) {
+                    console.error('获取磁盘使用率失败:', error);
+                }
+
+                // 获取活跃会话数
+                try {
+                    const sessionsResponse = await fetch('/api/terminal/sessions');
+                    const sessionsData = await sessionsResponse.json();
+                    document.getElementById('active-sessions').textContent = sessionsData.active_sessions || 0;
+                } catch (error) {
+                    console.error('获取会话信息失败:', error);
+                }
+            } catch (error) {
+                console.error('加载系统信息失败:', error);
+            }
+        }
+
+        startSystemMonitoring() {
+            // 每5秒更新一次系统信息
+            setInterval(() => {
+                this.loadSystemInfo();
+            }, 5000);
+
+            // 窗口大小改变时重新调整终端大小
+            window.addEventListener('resize', () => {
+                this.terminals.forEach((terminalInfo) => {
+                    if (terminalInfo.fitAddon) {
+                        terminalInfo.fitAddon.fit();
+                    }
+                });
+            });
+        }
+    }
+
+    // 初始化集成终端管理器
+    const terminalManager = new IntegratedTerminalManager();
+</script>
+{% endblock %}

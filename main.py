@@ -6,6 +6,11 @@ Mini PM2 FastAPI 主应用
 import os
 import json
 import asyncio
+import threading
+import queue
+import select
+import time
+import platform
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from contextlib import asynccontextmanager
@@ -242,6 +247,16 @@ async def logs_page(request: Request):
 async def settings_page(request: Request):
     """系统设置页面"""
     return templates.TemplateResponse("settings.html", {"request": request})
+
+@app.get("/terminal", response_class=HTMLResponse)
+async def terminal_page(request: Request):
+    """终端管理页面"""
+    return templates.TemplateResponse("terminal.html", {"request": request})
+
+@app.get("/terminal-enhanced", response_class=HTMLResponse)
+async def terminal_enhanced_page(request: Request):
+    """增强终端管理页面"""
+    return templates.TemplateResponse("terminal_enhanced.html", {"request": request})
 
 # ==================== API 路由 ====================
 
@@ -593,6 +608,357 @@ async def batch_clear_task_history(request: BatchTaskRequest) -> JSONResponse:
         })
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"批量清空历史失败: {str(e)}")
+
+# ==================== 终端管理 API ====================
+
+class TerminalCommand(BaseModel):
+    command: str = Field(..., description="要执行的命令")
+
+# 存储活跃的终端会话
+active_terminals = {}
+
+@app.websocket("/ws/terminal/{session_id}")
+async def websocket_terminal(websocket: WebSocket, session_id: str):
+    """WebSocket终端连接"""
+    await websocket.accept()
+    
+    try:
+        # 创建新的终端会话
+        import pty
+        import os
+        import select
+        import threading
+        import queue
+        import time
+        
+        # 创建伪终端
+        master, slave = pty.openpty()
+        
+        # 启动shell进程
+        import subprocess
+        import platform
+        
+        system = platform.system()
+        if system == "Windows":
+            # Windows使用cmd
+            process = subprocess.Popen(
+                ["cmd.exe"],
+                stdin=slave,
+                stdout=slave,
+                stderr=slave,
+                start_new_session=True
+            )
+        else:
+            # Linux/macOS使用bash
+            process = subprocess.Popen(
+                ["/bin/bash"],
+                stdin=slave,
+                stdout=slave,
+                stderr=slave,
+                start_new_session=True
+            )
+        
+        # 存储会话信息
+        active_terminals[session_id] = {
+            "websocket": websocket,
+            "process": process,
+            "master": master,
+            "slave": slave,
+            "created_at": time.time()
+        }
+        
+        # 发送连接成功消息
+        await websocket.send_text(json.dumps({
+            "type": "connection",
+            "status": "connected",
+            "session_id": session_id,
+            "system": system
+        }))
+        
+        # 创建数据队列
+        data_queue = queue.Queue()
+        
+        def read_from_pty():
+            """从伪终端读取数据"""
+            try:
+                while process.poll() is None:
+                    ready, _, _ = select.select([master], [], [], 0.1)
+                    if ready:
+                        data = os.read(master, 1024)
+                        if data:
+                            data_queue.put(data.decode('utf-8', errors='ignore'))
+            except Exception as e:
+                print(f"PTY读取错误: {e}")
+        
+        # 启动读取线程
+        read_thread = threading.Thread(target=read_from_pty, daemon=True)
+        read_thread.start()
+        
+        # 主循环：处理WebSocket消息和PTY输出
+        while True:
+            try:
+                # 检查WebSocket消息
+                try:
+                    message = await asyncio.wait_for(websocket.receive_text(), timeout=0.1)
+                    data = json.loads(message)
+                    
+                    if data.get("type") == "input":
+                        command = data.get("command", "")
+                        if command:
+                            os.write(master, command.encode())
+                            
+                except asyncio.TimeoutError:
+                    pass
+                except Exception as e:
+                    print(f"接收WebSocket消息错误: {e}")
+                    break
+                
+                # 检查PTY输出
+                try:
+                    while not data_queue.empty():
+                        output = data_queue.get_nowait()
+                        await websocket.send_text(json.dumps({
+                            "type": "output",
+                            "data": output
+                        }))
+                except queue.Empty:
+                    pass
+                
+                # 检查进程是否还在运行
+                if process.poll() is not None:
+                    break
+                    
+            except Exception as e:
+                print(f"WebSocket终端错误: {e}")
+                break
+                
+    except Exception as e:
+        print(f"终端会话创建失败: {e}")
+        await websocket.send_text(json.dumps({
+            "type": "error",
+            "message": f"终端创建失败: {str(e)}"
+        }))
+    finally:
+        # 清理资源
+        if session_id in active_terminals:
+            session_info = active_terminals[session_id]
+            try:
+                session_info["process"].terminate()
+                session_info["process"].wait(timeout=5)
+            except:
+                session_info["process"].kill()
+            
+            try:
+                os.close(session_info["master"])
+                os.close(session_info["slave"])
+            except:
+                pass
+            
+            del active_terminals[session_id]
+        
+        try:
+            await websocket.close()
+        except:
+            pass
+
+@app.get("/api/terminal/sessions")
+async def get_terminal_sessions() -> Dict[str, Any]:
+    """获取活跃的终端会话列表"""
+    sessions = []
+    for session_id, session_info in active_terminals.items():
+        sessions.append({
+            "session_id": session_id,
+            "created_at": session_info["created_at"],
+            "uptime": time.time() - session_info["created_at"],
+            "system": platform.system()
+        })
+    
+    return {
+        "active_sessions": len(sessions),
+        "sessions": sessions
+    }
+
+@app.post("/api/terminal/sessions/{session_id}/create")
+async def create_terminal_session(session_id: str) -> Dict[str, Any]:
+    """创建新的终端会话"""
+    try:
+        import pty
+        import subprocess
+        import platform
+        
+        # 创建伪终端
+        master, slave = pty.openpty()
+        
+        # 启动shell进程
+        system = platform.system()
+        if system == "Windows":
+            # Windows使用cmd
+            process = subprocess.Popen(
+                ["cmd.exe"],
+                stdin=slave,
+                stdout=slave,
+                stderr=slave,
+                start_new_session=True
+            )
+        else:
+            # Linux/macOS使用bash
+            process = subprocess.Popen(
+                ["/bin/bash"],
+                stdin=slave,
+                stdout=slave,
+                stderr=slave,
+                start_new_session=True
+            )
+        
+        # 存储会话信息
+        active_terminals[session_id] = {
+            "process": process,
+            "master": master,
+            "slave": slave,
+            "created_at": time.time()
+        }
+        
+        return {
+            "success": True,
+            "session_id": session_id,
+            "message": "会话创建成功"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"创建会话失败: {str(e)}")
+
+@app.post("/api/terminal/sessions/{session_id}/terminate")
+async def terminate_terminal_session(session_id: str) -> Dict[str, Any]:
+    """终止终端会话"""
+    try:
+        if session_id not in active_terminals:
+            raise HTTPException(status_code=404, detail="会话不存在")
+        
+        session_info = active_terminals[session_id]
+        
+        # 终止进程
+        try:
+            session_info["process"].terminate()
+            session_info["process"].wait(timeout=5)
+        except:
+            session_info["process"].kill()
+        
+        # 关闭文件描述符
+        try:
+            os.close(session_info["master"])
+            os.close(session_info["slave"])
+        except:
+            pass
+        
+        # 从活跃会话中移除
+        del active_terminals[session_id]
+        
+        return {
+            "success": True,
+            "message": "会话已终止"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"终止会话失败: {str(e)}")
+
+@app.post("/api/terminal/execute")
+async def execute_terminal_command(command_data: TerminalCommand) -> Dict[str, Any]:
+    """执行终端命令（HTTP API版本，用于兼容性）"""
+    import subprocess
+    import platform
+    import shlex
+    
+    try:
+        command = command_data.command.strip()
+        if not command:
+            raise HTTPException(status_code=400, detail="命令不能为空")
+        
+        # 安全检查：禁止执行危险命令
+        dangerous_commands = [
+            'rm -rf', 'dd', 'mkfs', 'fdisk', 'format', 'del /s', 'rd /s',
+            'shutdown', 'halt', 'reboot', 'init', 'systemctl', 'service',
+            'sudo', 'su', 'passwd', 'chmod 777', 'chown root'
+        ]
+        
+        command_lower = command.lower()
+        for dangerous in dangerous_commands:
+            if dangerous in command_lower:
+                raise HTTPException(status_code=400, detail=f"禁止执行危险命令: {dangerous}")
+        
+        # 根据操作系统选择合适的shell
+        system = platform.system()
+        if system == "Windows":
+            # Windows使用cmd
+            shell_cmd = ["cmd", "/c", command]
+        else:
+            # Linux/macOS使用bash
+            shell_cmd = ["/bin/bash", "-c", command]
+        
+        # 执行命令
+        process = subprocess.Popen(
+            shell_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        try:
+            stdout, stderr = process.communicate(timeout=30)  # 30秒超时
+        except subprocess.TimeoutExpired:
+            process.kill()
+            raise subprocess.TimeoutExpired(command, 30)
+        
+        return {
+            "success": process.returncode == 0,
+            "output": stdout,
+            "error": stderr if stderr else None,
+            "return_code": process.returncode,
+            "command": command
+        }
+        
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=408, detail="命令执行超时")
+    except subprocess.SubprocessError as e:
+        raise HTTPException(status_code=500, detail=f"命令执行失败: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"执行命令时发生错误: {str(e)}")
+
+@app.get("/api/terminal/system-info")
+async def get_terminal_system_info() -> Dict[str, Any]:
+    """获取终端系统信息"""
+    import platform
+    import psutil
+    
+    try:
+        system_info = {
+            "platform": platform.system(),
+            "platform_version": platform.version(),
+            "machine": platform.machine(),
+            "processor": platform.processor(),
+            "python_version": platform.python_version(),
+            "cpu_count": psutil.cpu_count(),
+            "memory_total": psutil.virtual_memory().total,
+            "disk_partitions": []
+        }
+        
+        # 获取磁盘分区信息
+        for partition in psutil.disk_partitions():
+            try:
+                usage = psutil.disk_usage(partition.mountpoint)
+                system_info["disk_partitions"].append({
+                    "device": partition.device,
+                    "mountpoint": partition.mountpoint,
+                    "fstype": partition.fstype,
+                    "total": usage.total,
+                    "used": usage.used,
+                    "free": usage.free,
+                    "percent": usage.percent
+                })
+            except PermissionError:
+                continue
+        
+        return system_info
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取系统信息失败: {str(e)}")
 
 # 单个任务操作API - 必须在批量操作之后定义
 @app.post("/api/tasks/{task_id}/run")
@@ -1391,48 +1757,63 @@ async def get_storage_info() -> Dict[str, Any]:
         
         tasks = await task_store.get_all_tasks()
         
-        # 获取存储配置信息
-        storage_config = {
-            "type": CONFIG["storage_type"],
-            "config": {}
-        }
+        # 计算存储大小
+        size_bytes = 0
+        status = "healthy"
         
-        if CONFIG["storage_type"] == "redis":
-            storage_config["config"] = {
-                "url": CONFIG["redis_url"],
-                "db": CONFIG["redis_db"]
-            }
-        elif CONFIG["storage_type"] == "sqlite":
-            storage_config["config"] = {
-                "database": CONFIG["sqlite_db"]
-            }
-        else:
-            storage_config["config"] = {
-                "file": CONFIG["json_file"],
-                "jobs_directory": CONFIG.get("jobs_directory"),
-                "task_file_prefix": CONFIG.get("task_file_prefix", "task")
-            }
-        
-        info = {
-            "storage_config": storage_config,
-            "total_tasks": len(tasks),
-            "enabled_tasks": len([t for t in tasks if t.get("enabled", True)]),
-            "disabled_tasks": len([t for t in tasks if not t.get("enabled", True)]),
-            "storage_size": "N/A"  # 可以添加实际文件大小计算
-        }
-        
-        # 如果是JSON存储且有jobs目录，计算存储大小
-        if CONFIG["storage_type"] == "json" and CONFIG.get("jobs_directory"):
-            try:
-                total_size = 0
-                if os.path.exists(CONFIG["jobs_directory"]):
+        if CONFIG["storage_type"] == "json":
+            # JSON文件存储
+            if CONFIG.get("jobs_directory") and os.path.exists(CONFIG["jobs_directory"]):
+                try:
                     for filename in os.listdir(CONFIG["jobs_directory"]):
                         if filename.endswith('.json'):
                             file_path = os.path.join(CONFIG["jobs_directory"], filename)
-                            total_size += os.path.getsize(file_path)
-                info["storage_size"] = f"{total_size} bytes"
+                            if os.path.exists(file_path):
+                                size_bytes += os.path.getsize(file_path)
+                except Exception as e:
+                    status = "error"
+                    print(f"计算JSON存储大小失败: {e}")
+            else:
+                # 单个JSON文件
+                json_file = CONFIG.get("json_file", "tasks.json")
+                if os.path.exists(json_file):
+                    size_bytes = os.path.getsize(json_file)
+                else:
+                    status = "warning"
+        
+        elif CONFIG["storage_type"] == "sqlite":
+            # SQLite数据库
+            db_file = CONFIG.get("sqlite_db", "tasks.db")
+            if os.path.exists(db_file):
+                size_bytes = os.path.getsize(db_file)
+            else:
+                status = "warning"
+        
+        elif CONFIG["storage_type"] == "redis":
+            # Redis存储 - 估算大小
+            try:
+                import redis.asyncio as redis
+                redis_client = redis.from_url(CONFIG["redis_url"], db=CONFIG["redis_db"])
+                await redis_client.ping()
+                # Redis大小估算：每个任务约1KB
+                size_bytes = len(tasks) * 1024
             except Exception as e:
-                info["storage_size"] = f"计算失败: {str(e)}"
+                status = "error"
+                print(f"Redis连接失败: {e}")
+        
+        # 计算使用率（基于任务数量）
+        usage_percent = min(len(tasks) * 2, 100)  # 每个任务2%使用率，最大100%
+        
+        info = {
+            "status": status,
+            "size_bytes": size_bytes,
+            "usage_percent": usage_percent,
+            "total_tasks": len(tasks),
+            "enabled_tasks": len([t for t in tasks if t.get("enabled", True)]),
+            "disabled_tasks": len([t for t in tasks if not t.get("enabled", True)]),
+            "storage_type": CONFIG["storage_type"],
+            "config_file": CONFIG.get("json_file", CONFIG.get("sqlite_db", "Redis"))
+        }
         
         return info
     except Exception as e:

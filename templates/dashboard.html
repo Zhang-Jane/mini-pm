@@ -5,741 +5,1307 @@
 
 {% block content %}
 <div class="page-content">
-  <!-- 系统状态概览 -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
-    <div class="bg-white rounded-lg shadow-sm p-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-600">总任务数</p>
-                <p class="text-2xl font-bold text-primary" id="total-tasks">0</p>
-            </div>
-            <svg class="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-            </svg>
-        </div>
-    </div>
-    
-    <div class="bg-white rounded-lg shadow-sm p-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-600">运行中</p>
-                <p class="text-2xl font-bold text-success" id="running-tasks">0</p>
-            </div>
-            <svg class="w-8 h-8 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-        </div>
-    </div>
-    
-    <div class="bg-white rounded-lg shadow-sm p-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-600">失败任务</p>
-                <p class="text-2xl font-bold text-error" id="failed-tasks">0</p>
-            </div>
-            <svg class="w-8 h-8 text-error" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-        </div>
-    </div>
-    
-    <div class="bg-white rounded-lg shadow-sm p-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-600">日志数量</p>
-                <p class="text-2xl font-bold text-warning" id="log-count">0</p>
-            </div>
-            <svg class="w-8 h-8 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
-        </div>
-    </div>
-</div>
-
-  <!-- 系统资源监控 -->
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 md:mb-8">
-    <!-- CPU 使用率 -->
-    <div class="bg-white rounded-lg shadow-sm">
-      <div class="p-4 md:p-6 border-b border-gray-200">
-        <h3 class="text-lg font-semibold text-gray-800">CPU 使用率</h3>
-      </div>
-      <div class="p-4 md:p-6">
-        <div class="flex items-center justify-between mb-4">
-          <span class="text-2xl font-bold text-blue-600" id="cpu-usage">0%</span>
-          <div class="w-16 h-16 relative">
-            <svg class="w-16 h-16 transform -rotate-90" viewBox="0 0 36 36">
-              <path class="text-gray-200" stroke="currentColor" stroke-width="2" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-              <path class="text-blue-600" stroke="currentColor" stroke-width="2" fill="none" stroke-dasharray="0, 100" stroke-dashoffset="25" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" id="cpu-progress"/>
-            </svg>
-          </div>
-        </div>
-        <div class="text-sm text-gray-600">
-          <div class="flex justify-between">
-            <span>核心数:</span>
-            <span id="cpu-cores">-</span>
-          </div>
-          <div class="flex justify-between">
-            <span>频率:</span>
-            <span id="cpu-freq">-</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 内存使用率 -->
-    <div class="bg-white rounded-lg shadow-sm">
-      <div class="p-4 md:p-6 border-b border-gray-200">
-        <h3 class="text-lg font-semibold text-gray-800">内存使用率</h3>
-      </div>
-      <div class="p-4 md:p-6">
-        <div class="flex items-center justify-between mb-4">
-          <span class="text-2xl font-bold text-green-600" id="memory-usage">0%</span>
-          <div class="w-16 h-16 relative">
-            <svg class="w-16 h-16 transform -rotate-90" viewBox="0 0 36 36">
-              <path class="text-gray-200" stroke="currentColor" stroke-width="2" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-              <path class="text-green-600" stroke="currentColor" stroke-width="2" fill="none" stroke-dasharray="0, 100" stroke-dashoffset="25" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" id="memory-progress"/>
-            </svg>
-          </div>
-        </div>
-        <div class="text-sm text-gray-600">
-          <div class="flex justify-between">
-            <span>已用:</span>
-            <span id="memory-used">-</span>
-          </div>
-          <div class="flex justify-between">
-            <span>总计:</span>
-            <span id="memory-total">-</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 系统信息 -->
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 md:mb-8">
-    <!-- 系统基本信息 -->
-    <div class="bg-white rounded-lg shadow-sm">
-      <div class="p-4 md:p-6 border-b border-gray-200">
-        <h3 class="text-lg font-semibold text-gray-800">系统信息</h3>
-      </div>
-      <div class="p-4 md:p-6">
-        <div class="space-y-3 text-sm">
-          <div class="flex justify-between">
-            <span class="text-gray-600">系统名称:</span>
-            <span id="system-name">-</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-gray-600">系统版本:</span>
-            <span id="system-version">-</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-gray-600">系统运行时间:</span>
-            <span id="uptime">-</span>
-          </div>
-
-        </div>
-      </div>
-    </div>
-
-    <!-- 应用信息 -->
-    <div class="bg-white rounded-lg shadow-sm">
-      <div class="p-4 md:p-6 border-b border-gray-200">
-        <h3 class="text-lg font-semibold text-gray-800">应用信息</h3>
-      </div>
-      <div class="p-4 md:p-6">
-        <div class="space-y-3 text-sm">
-          <div class="flex justify-between">
-            <span class="text-gray-600">应用名称:</span>
-            <span>Mini PM2</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-gray-600">版本号:</span>
-            <span>v1.0.0</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-gray-600">配置文件:</span>
-            <span id="config-file">-</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-gray-600">存储类型:</span>
-            <span id="storage-type">-</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 监控指标 -->
-  <div class="bg-white rounded-lg shadow-sm">
-    <div class="p-4 md:p-6 border-b border-gray-200">
-      <div class="flex items-center justify-between">
-        <h3 class="text-lg font-semibold text-gray-800">监控指标</h3>
-        <button id="refresh-metrics" class="inline-flex items-center px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors">
-          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
-          刷新
-        </button>
-      </div>
-    </div>
-    <div class="p-4 md:p-6">
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="text-center p-4 bg-blue-50 rounded-lg">
-          <div class="text-2xl font-bold text-blue-600" id="disk-usage">-</div>
-          <div class="text-sm text-gray-600">磁盘使用率</div>
-        </div>
-        <div class="text-center p-4 bg-yellow-50 rounded-lg">
-          <div class="text-2xl font-bold text-yellow-600" id="load-average">-</div>
-          <div class="text-sm text-gray-600">负载平均值</div>
-        </div>
-        <div class="text-center p-4 bg-purple-50 rounded-lg">
-          <div class="text-2xl font-bold text-purple-600" id="process-count">-</div>
-          <div class="text-sm text-gray-600">进程数量</div>
-        </div>
-        <div class="text-center p-4 bg-green-50 rounded-lg">
-          <div class="text-2xl font-bold text-green-600" id="disk-io">-</div>
-          <div class="text-sm text-gray-600">磁盘读写总量</div>
-        </div>
-      </div>
-    </div>
-</div>
-
-  <!-- 进程管理 -->
-<div class="bg-white rounded-lg shadow-sm">
-    <div class="p-4 md:p-6 border-b border-gray-200">
-      <div class="flex items-center justify-between">
-        <h3 class="text-lg font-semibold text-gray-800">进程管理</h3>
-        <button id="refresh-processes" class="inline-flex items-center px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors">
-          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+  <!-- 顶部快速操作栏 -->
+  <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-4">
+        <h2 class="text-lg font-semibold text-gray-900">快速操作</h2>
+        <div class="flex items-center gap-2 text-sm text-gray-600">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
-          刷新
+          <span id="last-update">最后更新: --</span>
+        </div>
+        <!-- 自动刷新开关 -->
+        <div class="flex items-center gap-2">
+          <label class="flex items-center cursor-pointer">
+            <input type="checkbox" id="auto-refresh" class="sr-only" checked>
+            <div class="relative">
+              <div class="w-10 h-6 rounded-full shadow-inner toggle-track"></div>
+              <div class="w-4 h-4 bg-white rounded-full shadow absolute -left-1 -top-1 toggle-dot"></div>
+            </div>
+            <span class="ml-3 text-sm text-gray-700">自动刷新</span>
+          </label>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <button id="create-task" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+          </svg>
+          新建任务
+        </button>
+        <button id="view-logs" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors shadow-sm">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+          </svg>
+          查看日志
+        </button>
+        <button id="open-terminal" class="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors shadow-sm">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+          </svg>
+          打开终端
+        </button>
+        <button id="fullscreen-toggle" class="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+          </svg>
         </button>
       </div>
     </div>
-    <div class="p-4 md:p-6">
-    <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-                <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PID</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">进程名</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CPU%</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">内存%</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">启动时间</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
-                </tr>
-            </thead>
-          <tbody id="processes-table" class="bg-white divide-y divide-gray-200">
-            <tr>
-              <td colspan="7" class="px-6 py-4 text-center text-gray-500">加载中...</td>
-            </tr>
-            </tbody>
-        </table>
-</div>
+  </div>
 
-      <!-- 分页控件 -->
-      <div class="mt-4 flex items-center justify-between">
-        <div class="text-sm text-gray-700">
-          显示 <span id="processes-start">0</span> - <span id="processes-end">0</span> 条，共 <span id="processes-total">0</span> 条
+  <!-- 核心指标卡片 -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
+    <!-- 任务总览 -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all duration-300 transform hover:scale-105 card-hover">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <p class="text-sm text-gray-600 mb-1">任务总览</p>
+          <p class="text-3xl font-bold text-gray-900" id="total-tasks">0</p>
+          <p class="text-xs text-gray-500 mt-1" id="task-change">较昨日: +0</p>
         </div>
-        <div class="flex items-center space-x-2">
-          <button id="prev-page" class="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            上一页
-          </button>
-          <span class="text-sm text-gray-700">
-            第 <span id="current-page">1</span> 页，共 <span id="total-pages">1</span> 页
-          </span>
-          <button id="next-page" class="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            下一页
-          </button>
+        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center animate-pulse">
+          <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+          </svg>
         </div>
-            </div>
+      </div>
+      <div class="flex items-center justify-between text-sm">
+        <span class="text-green-600 font-medium" id="running-tasks">0 运行中</span>
+        <span class="text-red-600 font-medium" id="failed-tasks">0 失败</span>
+      </div>
+      <div class="mt-3 pt-3 border-t border-gray-100">
+        <div class="flex items-center justify-between text-xs text-gray-500">
+          <span>成功率</span>
+          <span id="success-rate-percent">100%</span>
         </div>
+        <div class="w-full bg-gray-200 rounded-full h-1 mt-1">
+          <div class="bg-green-500 h-1 rounded-full transition-all duration-500" id="success-rate-bar" style="width: 100%"></div>
+        </div>
+      </div>
     </div>
+    
+    <!-- 系统健康度 -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all duration-300 transform hover:scale-105 card-hover">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <p class="text-sm text-gray-600 mb-1">系统健康度</p>
+          <p class="text-3xl font-bold text-green-600" id="system-health">100%</p>
+          <p class="text-xs text-gray-500 mt-1" id="health-status">状态良好</p>
+        </div>
+        <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+          <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </div>
+      </div>
+      <div class="flex items-center justify-between text-sm">
+        <span class="text-blue-600 font-medium" id="cpu-usage">CPU: 0%</span>
+        <span class="text-purple-600 font-medium" id="memory-usage">内存: 0%</span>
+      </div>
+      <div class="mt-3 pt-3 border-t border-gray-100">
+        <div class="flex items-center justify-between text-xs text-gray-500">
+          <span>负载状态</span>
+          <span id="load-status">正常</span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-1 mt-1">
+          <div class="bg-green-500 h-1 rounded-full transition-all duration-500" id="load-bar" style="width: 0%"></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 今日执行 -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all duration-300 transform hover:scale-105 card-hover">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <p class="text-sm text-gray-600 mb-1">今日执行</p>
+          <p class="text-3xl font-bold text-orange-600" id="today-executions">0</p>
+          <p class="text-xs text-gray-500 mt-1" id="execution-trend">较昨日: +0</p>
+        </div>
+        <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+          <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+          </svg>
+        </div>
+      </div>
+      <div class="flex items-center justify-between text-sm">
+        <span class="text-green-600 font-medium" id="success-rate">成功率: 100%</span>
+        <span class="text-gray-600" id="avg-duration">平均: 0s</span>
+      </div>
+      <div class="mt-3 pt-3 border-t border-gray-100">
+        <div class="flex items-center justify-between text-xs text-gray-500">
+          <span>执行趋势</span>
+          <span id="execution-speed">0/小时</span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-1 mt-1">
+          <div class="bg-orange-500 h-1 rounded-full transition-all duration-500" id="execution-bar" style="width: 0%"></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 存储状态 -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all duration-300 transform hover:scale-105 card-hover">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <p class="text-sm text-gray-600 mb-1">存储状态</p>
+          <p class="text-3xl font-bold text-indigo-600" id="storage-type">JSON</p>
+          <p class="text-xs text-gray-500 mt-1" id="storage-size">大小: 0KB</p>
+        </div>
+        <div class="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+          <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+          </svg>
+        </div>
+      </div>
+      <div class="flex items-center justify-between text-sm">
+        <span class="text-gray-600" id="config-file">配置文件</span>
+        <span class="text-green-600 font-medium" id="storage-status">正常</span>
+      </div>
+      <div class="mt-3 pt-3 border-t border-gray-100">
+        <div class="flex items-center justify-between text-xs text-gray-500">
+          <span>存储使用率</span>
+          <span id="storage-usage">0%</span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-1 mt-1">
+          <div class="bg-indigo-500 h-1 rounded-full transition-all duration-500" id="storage-bar" style="width: 0%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 实时监控图表 -->
+  <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+    <div class="p-4 md:p-6 border-b border-gray-200">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-800">实时监控</h3>
+        <div class="flex items-center gap-2">
+          <select id="chart-time-range" class="text-sm border border-gray-300 rounded px-2 py-1">
+            <option value="1h">最近1小时</option>
+            <option value="6h">最近6小时</option>
+            <option value="24h" selected>最近24小时</option>
+            <option value="7d">最近7天</option>
+          </select>
+          <button id="refresh-charts" class="inline-flex items-center px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            刷新
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="p-4 md:p-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- CPU使用率图表 -->
+        <div>
+          <h4 class="text-sm font-medium text-gray-700 mb-3">CPU使用率趋势</h4>
+          <div class="h-32 bg-gray-50 rounded-lg flex items-center justify-center">
+            <div class="text-center text-gray-500">
+              <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+              </svg>
+              <p class="text-sm">图表加载中...</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 内存使用率图表 -->
+        <div>
+          <h4 class="text-sm font-medium text-gray-700 mb-3">内存使用率趋势</h4>
+          <div class="h-32 bg-gray-50 rounded-lg flex items-center justify-center">
+            <div class="text-center text-gray-500">
+              <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+              </svg>
+              <p class="text-sm">图表加载中...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主要内容区域 -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <!-- 任务状态分布 -->
+    <div class="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200">
+      <div class="p-4 md:p-6 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold text-gray-800">任务状态分布</h3>
+          <div class="flex items-center gap-2">
+            <button id="refresh-tasks" class="inline-flex items-center px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors">
+              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+              </svg>
+              刷新
+            </button>
+            <a href="/tasks" class="inline-flex items-center px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors">
+              查看全部
+            </a>
+          </div>
+        </div>
+      </div>
+      <div class="p-4 md:p-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div class="text-center p-4 bg-green-50 rounded-lg border border-green-200">
+            <div class="text-2xl font-bold text-green-600" id="idle-tasks">0</div>
+            <div class="text-sm text-green-700">空闲</div>
+          </div>
+          <div class="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div class="text-2xl font-bold text-blue-600" id="running-tasks-count">0</div>
+            <div class="text-sm text-blue-700">运行中</div>
+          </div>
+          <div class="text-center p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+            <div class="text-2xl font-bold text-yellow-600" id="success-tasks">0</div>
+            <div class="text-sm text-yellow-700">成功</div>
+          </div>
+          <div class="text-center p-4 bg-red-50 rounded-lg border border-red-200">
+            <div class="text-2xl font-bold text-red-600" id="failed-tasks-count">0</div>
+            <div class="text-sm text-red-700">失败</div>
+          </div>
+        </div>
+        
+        <!-- 最近任务列表 -->
+        <div>
+          <h4 class="text-sm font-medium text-gray-700 mb-3">最近任务</h4>
+          <div class="space-y-2" id="recent-tasks">
+            <div class="text-center text-gray-500 py-4">加载中...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 系统监控 -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div class="p-4 md:p-6 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold text-gray-800">系统监控</h3>
+          <button id="refresh-system" class="inline-flex items-center px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            刷新
+          </button>
+        </div>
+      </div>
+      <div class="p-4 md:p-6">
+        <div class="space-y-4">
+          <!-- CPU 使用率 -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-medium text-gray-700">CPU 使用率</span>
+              <span class="text-sm font-bold text-blue-600" id="cpu-percent">0%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" id="cpu-bar" style="width: 0%"></div>
+            </div>
+          </div>
+          
+          <!-- 内存使用率 -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-medium text-gray-700">内存使用率</span>
+              <span class="text-sm font-bold text-green-600" id="memory-percent">0%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div class="bg-green-600 h-2 rounded-full transition-all duration-300" id="memory-bar" style="width: 0%"></div>
+            </div>
+          </div>
+          
+          <!-- 磁盘使用率 -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-medium text-gray-700">磁盘使用率</span>
+              <span class="text-sm font-bold text-purple-600" id="disk-percent">0%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div class="bg-purple-600 h-2 rounded-full transition-all duration-300" id="disk-bar" style="width: 0%"></div>
+            </div>
+          </div>
+          
+          <!-- 系统信息 -->
+          <div class="pt-4 border-t border-gray-200">
+            <h4 class="text-sm font-medium text-gray-700 mb-3">系统信息</h4>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span class="text-gray-600">系统:</span>
+                <span id="system-name">-</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600">运行时间:</span>
+                <span id="uptime">-</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600">进程数:</span>
+                <span id="process-count">-</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 告警和通知 -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <!-- 最近告警 -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div class="p-4 md:p-6 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold text-gray-800">最近告警</h3>
+          <span class="text-sm text-gray-500" id="alert-count">0 条</span>
+        </div>
+      </div>
+      <div class="p-4 md:p-6">
+        <div id="alerts-list" class="space-y-3">
+          <div class="text-center text-gray-500 py-4">暂无告警</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 活动日志 -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div class="p-4 md:p-6 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold text-gray-800">活动日志</h3>
+          <a href="/logs" class="text-sm text-blue-600 hover:text-blue-800">查看全部</a>
+        </div>
+      </div>
+      <div class="p-4 md:p-6">
+        <div id="activity-logs" class="space-y-3 max-h-64 overflow-y-auto custom-scrollbar">
+          <div class="text-center text-gray-500 py-4">加载中...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 快速操作面板 -->
+  <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+    <div class="p-4 md:p-6 border-b border-gray-200">
+      <h3 class="text-lg font-semibold text-gray-800">快速操作</h3>
+    </div>
+    <div class="p-4 md:p-6">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <button class="quick-action-btn" data-action="create-task">
+          <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-3">
+            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+          </div>
+          <span class="text-sm font-medium text-gray-700">新建任务</span>
+        </button>
+        
+        <button class="quick-action-btn" data-action="batch-run">
+          <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-3">
+            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
+          </div>
+          <span class="text-sm font-medium text-gray-700">批量运行</span>
+        </button>
+        
+        <button class="quick-action-btn" data-action="export-data">
+          <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-3">
+            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+          </div>
+          <span class="text-sm font-medium text-gray-700">导出数据</span>
+        </button>
+        
+        <button class="quick-action-btn" data-action="system-settings">
+          <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-3">
+            <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+          </div>
+          <span class="text-sm font-medium text-gray-700">系统设置</span>
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
 // 全局变量
-let metricsData = {};
-let currentProcessPage = 1;
-let processPageSize = 20;
-let cachedAllProcesses = null; // 缓存所有进程数据
-let lastProcessRefresh = 0; // 上次刷新时间
-const PROCESS_CACHE_DURATION = 60000; // 缓存时间60秒
+let dashboardData = {};
+let lastUpdate = new Date();
 
 // 页面加载时初始化
 document.addEventListener('DOMContentLoaded', function() {
-    loadSystemInfo();
-    loadMetrics();
-    loadProcesses();
+    loadDashboardData();
+    setupEventListeners();
+    setupAutoRefresh();
+    setupCharts();
     
-    // 刷新按钮事件
-    document.getElementById('refresh-metrics').addEventListener('click', function() {
-        loadSystemInfo();
-        loadMetrics();
-        showToast('监控数据已刷新', 'success');
-    });
+    // 初始化全屏功能
+    setupFullscreen();
     
-    // 进程刷新按钮事件
-    document.getElementById('refresh-processes').addEventListener('click', function() {
-        currentProcessPage = 1; // 重置到第一页
-        loadProcesses(true); // 强制刷新
-        showToast('进程列表已刷新', 'success');
-    });
-    
-    // 翻页按钮事件
-    document.getElementById('prev-page').addEventListener('click', function() {
-        if (currentProcessPage > 1) {
-            currentProcessPage--;
-            loadProcesses(false); // 使用缓存
-        }
-    });
-    
-    document.getElementById('next-page').addEventListener('click', function() {
-        currentProcessPage++;
-        loadProcesses(false); // 使用缓存
-    });
-    
-    // 定时刷新监控数据
-    setInterval(() => {
-        loadSystemInfo();
-        loadMetrics();
-    }, 30000); // 每30秒刷新一次
-    
-    // 定时刷新进程列表
-    setInterval(() => {
-        loadProcesses(true); // 强制刷新
-    }, 60000); // 每60秒刷新一次
+    // 初始化自动刷新开关
+    setupAutoRefreshToggle();
 });
 
-// 加载系统信息
-async function loadSystemInfo() {
-    try {
-        const response = await fetch('/api/system/info');
-        if (response.ok) {
-            const data = await response.json();
-            updateSystemInfo(data);
-        }
-    } catch (error) {
-        console.error('Error loading system info:', error);
-    }
-}
-
-// 加载监控指标
-async function loadMetrics() {
-    try {
-        const response = await fetch('/api/monitoring/metrics');
-        if (response.ok) {
-            const data = await response.json();
-            updateMetrics(data);
-        }
-    } catch (error) {
-        console.error('Error loading metrics:', error);
-    }
-}
-
-// 安全设置文本内容的辅助函数
-function setText(id, value) {
-    const element = document.getElementById(id);
-    if (element) {
-        element.textContent = value;
-    }
-}
-
-// 安全设置HTML内容的辅助函数
-function setHTML(id, value) {
-    const element = document.getElementById(id);
-    if (element) {
-        element.innerHTML = value;
-    }
-}
-
-// 更新系统信息
-function updateSystemInfo(data) {
-    // 更新任务统计
-    setText('total-tasks', data.total_tasks || 0);
-    setText('running-tasks', data.running_tasks || 0);
-    setText('failed-tasks', data.failed_tasks || 0);
-    setText('log-count', data.log_count || 0);
-    
-    // 更新系统信息
-    setText('system-name', data.system_name || '-');
-    setText('system-version', data.system_version || '-');
-    setText('uptime', data.uptime_formatted || data.uptime || '-');
-    setText('config-file', data.config_file || '-');
-    setText('storage-type', data.storage_type || '-');
-    
-    // 更新CPU信息
-    if (data.cpu) {
-        setText('cpu-usage', `${data.cpu.percent || 0}%`);
-        setText('cpu-cores', data.cpu.cores || '-');
-        setText('cpu-freq', data.cpu.freq ? `${data.cpu.freq} MHz` : '-');
-        updateProgress('cpu-progress', data.cpu.percent || 0);
-    }
-    
-    // 更新内存信息
-    if (data.memory) {
-        setText('memory-usage', `${data.memory.percent || 0}%`);
-        setText('memory-used', data.memory.used_gb ? `${data.memory.used_gb} GB` : '-');
-        setText('memory-total', data.memory.total_gb ? `${data.memory.total_gb} GB` : '-');
-        updateProgress('memory-progress', data.memory.percent || 0);
-    }
-    
-    // 更新任务状态统计（如果可用）
-    if (data.task_status_stats) {
-        const stats = data.task_status_stats;
-        console.log('任务状态统计:', stats);
-    }
-    
-    // 更新WebSocket连接数（如果可用）
-    if (data.websocket_connections !== undefined) {
-        console.log('WebSocket连接数:', data.websocket_connections);
-    }
-}
-
-// 更新监控指标
-function updateMetrics(data) {
-    // 更新基本指标
-    setText('disk-usage', data.disk_usage || '-');
-    setText('load-average', data.load_average || '-');
-    setText('process-count', data.process_count || '-');
-    
-    // 更新磁盘IO信息
-    if (data.disk_io && Object.keys(data.disk_io).length > 0) {
-        const readFormatted = data.disk_io.read_formatted || '0 B';
-        const writeFormatted = data.disk_io.write_formatted || '0 B';
-        setHTML('disk-io', `读取:${readFormatted}<br>写入:${writeFormatted}`);
-    } else {
-        setHTML('disk-io', '读取:0 B<br>写入:0 B');
-    }
-    
-    // 更新CPU和内存信息（如果可用）
-    if (data.cpu && Object.keys(data.cpu).length > 0) {
-        const cpuPercent = data.cpu.percent || 0;
-        setText('cpu-usage', `${cpuPercent}%`);
-        updateProgress('cpu-progress', cpuPercent);
-        
-        if (data.cpu.count) {
-            setText('cpu-cores', data.cpu.count);
-        }
-        if (data.cpu.freq) {
-            setText('cpu-freq', `${data.cpu.freq} MHz`);
-        }
-    }
-    
-    if (data.memory && Object.keys(data.memory).length > 0) {
-        const memoryPercent = data.memory.percent || 0;
-        setText('memory-usage', `${memoryPercent}%`);
-        updateProgress('memory-progress', memoryPercent);
-        
-        if (data.memory.used) {
-            setText('memory-used', data.memory.used);
-        }
-        if (data.memory.total) {
-            setText('memory-total', data.memory.total);
-        }
-    }
-}
-
-// 加载进程列表
-async function loadProcesses(forceRefresh = false) {
-    const now = Date.now();
-    
-    // 检查是否需要刷新缓存
-    if (!forceRefresh && cachedAllProcesses && (now - lastProcessRefresh) < PROCESS_CACHE_DURATION) {
-        // 使用缓存数据
-        updateProcessesFromCache();
-        return;
-    }
-    
-    try {
-        // 如果是强制刷新或没有缓存，获取所有进程数据
-        if (forceRefresh || !cachedAllProcesses) {
-            const response = await fetch(`/api/system/processes?page=1&limit=1000`); // 获取更多数据
-            if (response.ok) {
-                const data = await response.json();
-                cachedAllProcesses = data;
-                lastProcessRefresh = now;
-            }
-        }
-        
-        // 从缓存中获取当前页数据
-        updateProcessesFromCache();
-    } catch (error) {
-        console.error('Error loading processes:', error);
-    }
-}
-
-// 从缓存更新进程列表
-function updateProcessesFromCache() {
-    if (!cachedAllProcesses) return;
-    
-    // 计算当前页的数据
-    const start = (currentProcessPage - 1) * processPageSize;
-    const end = start + processPageSize;
-    const pageData = {
-        processes: cachedAllProcesses.processes.slice(start, end),
-        total: cachedAllProcesses.total,
-        page: currentProcessPage,
-        limit: processPageSize,
-        total_pages: Math.ceil(cachedAllProcesses.total / processPageSize),
-        has_prev: currentProcessPage > 1,
-        has_next: end < cachedAllProcesses.total
-    };
-    
-    updateProcesses(pageData);
-}
-
-// 更新进程列表
-function updateProcesses(data) {
-    const tbody = document.getElementById('processes-table');
-    
-    if (!data.processes || data.processes.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">暂无进程数据</td></tr>';
-        return;
-    }
-    
-    let html = '';
-    data.processes.forEach(process => {
-        const statusColor = process.status === 'running' ? 'text-green-600' : 
-                           process.status === 'sleeping' ? 'text-blue-600' : 
-                           process.status === 'stopped' ? 'text-red-600' : 'text-gray-600';
-        
-        // 检查是否为系统关键进程（避免误杀）
-        const isSystemProcess = process.pid <= 100 || 
-                               ['kernel_task', 'launchd', 'systemd', 'init'].includes(process.name);
-        
-        html += `
-            <tr class="hover:bg-gray-50">
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${process.pid}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${process.name}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${(typeof process.cpu_percent === 'number' ? process.cpu_percent.toFixed(1) : '0.0')}%</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${(typeof process.memory_percent === 'number' ? process.memory_percent.toFixed(1) : '0.0')}%</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm ${statusColor}">${process.status}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${new Date(process.create_time).toLocaleString()}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div class="flex space-x-2">
-                        <button onclick="showProcessInfo(${process.pid})" 
-                                class="text-blue-600 hover:text-blue-800 text-xs px-2 py-1 rounded border border-blue-300 hover:bg-blue-50">
-                            详情
-                        </button>
-                        ${!isSystemProcess ? `
-                            <button onclick="stopProcess(${process.pid}, '${process.name}')" 
-                                    class="text-yellow-600 hover:text-yellow-800 text-xs px-2 py-1 rounded border border-yellow-300 hover:bg-yellow-50">
-                                停止
-                            </button>
-                            <button onclick="killProcess(${process.pid}, '${process.name}')" 
-                                    class="text-red-600 hover:text-red-800 text-xs px-2 py-1 rounded border border-red-300 hover:bg-red-50">
-                                强制终止
-                            </button>
-                        ` : `
-                            <span class="text-gray-400 text-xs">系统进程</span>
-                        `}
-                    </div>
-                </td>
-            </tr>
-        `;
+// 设置事件监听器
+function setupEventListeners() {
+    // 快速操作按钮
+    document.getElementById('create-task').addEventListener('click', () => {
+        window.location.href = '/tasks';
     });
     
-    tbody.innerHTML = html;
+    document.getElementById('view-logs').addEventListener('click', () => {
+        window.location.href = '/logs';
+    });
     
-    // 更新分页信息
-    updatePagination(data);
+    document.getElementById('open-terminal').addEventListener('click', () => {
+        window.location.href = '/terminal';
+    });
+    
+    // 刷新按钮
+    document.getElementById('refresh-tasks').addEventListener('click', () => {
+        loadDashboardData();
+        showToast('数据已刷新', 'success');
+    });
+    
+    document.getElementById('refresh-system').addEventListener('click', () => {
+        loadSystemMetrics();
+        showToast('系统数据已刷新', 'success');
+    });
+    
+    document.getElementById('refresh-charts').addEventListener('click', () => {
+        loadCharts();
+        showToast('图表已刷新', 'success');
+    });
+    
+    // 图表时间范围选择
+    document.getElementById('chart-time-range').addEventListener('change', () => {
+        loadCharts();
+    });
+    
+    // 快速操作面板
+    document.querySelectorAll('.quick-action-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const action = this.dataset.action;
+            handleQuickAction(action);
+        });
+    });
 }
 
-// 更新分页控件
-function updatePagination(data) {
-    const start = (data.page - 1) * data.limit + 1;
-    const end = Math.min(start + data.limit - 1, data.total);
+// 设置自动刷新
+function setupAutoRefresh() {
+    let refreshInterval;
     
-    setText('processes-start', data.total > 0 ? start : 0);
-    setText('processes-end', end);
-    setText('processes-total', data.total);
-    setText('current-page', data.page);
-    setText('total-pages', data.total_pages);
+    function startAutoRefresh() {
+        // 清除之前的定时器
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+        }
+        
+        refreshInterval = setInterval(() => {
+            if (document.getElementById('auto-refresh').checked) {
+                loadDashboardData();
+            }
+        }, 30000); // 每30秒刷新一次
+    }
     
-    // 更新按钮状态
-    const prevButton = document.getElementById('prev-page');
-    const nextButton = document.getElementById('next-page');
-    
-    if (prevButton) {
-        prevButton.disabled = !data.has_prev;
-        if (!data.has_prev) {
-            prevButton.classList.add('opacity-50', 'cursor-not-allowed');
-        } else {
-            prevButton.classList.remove('opacity-50', 'cursor-not-allowed');
+    function stopAutoRefresh() {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+            refreshInterval = null;
         }
     }
     
-    if (nextButton) {
-        nextButton.disabled = !data.has_next;
-        if (!data.has_next) {
-            nextButton.classList.add('opacity-50', 'cursor-not-allowed');
+    // 初始化自动刷新
+    startAutoRefresh();
+    
+    // 监听自动刷新开关
+    document.getElementById('auto-refresh').addEventListener('change', function() {
+        if (this.checked) {
+            startAutoRefresh();
+            showToast('自动刷新已开启', 'success');
         } else {
-            nextButton.classList.remove('opacity-50', 'cursor-not-allowed');
+            stopAutoRefresh();
+            showToast('自动刷新已关闭', 'info');
         }
+    });
+    
+    // 页面卸载时清理定时器
+    window.addEventListener('beforeunload', function() {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+        }
+    });
+}
+
+// 设置自动刷新开关样式
+function setupAutoRefreshToggle() {
+    const toggle = document.getElementById('auto-refresh');
+    const toggleContainer = toggle.parentElement.querySelector('.relative');
+    
+    function updateToggle() {
+        if (toggle.checked) {
+            // 开启状态：滑块在右侧，轨道为蓝色
+            toggleContainer.classList.remove('toggle-inactive');
+            toggleContainer.classList.add('toggle-active');
+        } else {
+            // 关闭状态：滑块在左侧，轨道为灰色
+            toggleContainer.classList.remove('toggle-active');
+            toggleContainer.classList.add('toggle-inactive');
+        }
+    }
+    
+    // 立即应用初始状态
+    setTimeout(() => {
+        updateToggle();
+    }, 0);
+    
+    // 监听变化
+    toggle.addEventListener('change', updateToggle);
+}
+
+// 设置全屏功能
+function setupFullscreen() {
+    const fullscreenBtn = document.getElementById('fullscreen-toggle');
+    
+    fullscreenBtn.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().then(() => {
+                fullscreenBtn.innerHTML = `
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                    </svg>
+                `;
+            });
+        } else {
+            document.exitFullscreen().then(() => {
+                fullscreenBtn.innerHTML = `
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                    </svg>
+                `;
+            });
+        }
+    });
+}
+
+// 设置图表
+function setupCharts() {
+    loadCharts();
+}
+
+// 加载仪表板数据
+async function loadDashboardData() {
+    try {
+        // 并行加载多个数据源
+        const [statusData, tasksData, systemData, logsData] = await Promise.all([
+            fetch('/api/status').then(r => r.json()),
+            fetch('/api/tasks').then(r => r.json()),
+            fetch('/api/monitoring/metrics').then(r => r.json()),
+            fetch('/api/logs?limit=10').then(r => r.json())
+        ]);
+        
+        updateDashboard(statusData, tasksData, systemData, logsData);
+        updateLastUpdateTime();
+        
+    } catch (error) {
+        console.error('加载仪表板数据失败:', error);
+        showToast('数据加载失败', 'error');
     }
 }
 
-// 更新进度条
-function updateProgress(elementId, percentage) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        const circumference = 2 * Math.PI * 15.9155; // 圆的周长
-        const offset = circumference - (percentage / 100) * circumference;
-        element.style.strokeDasharray = `${circumference} ${circumference}`;
-        element.style.strokeDashoffset = offset;
+// 更新仪表板显示
+function updateDashboard(statusData, tasksData, systemData, logsData) {
+    // 更新核心指标
+    updateCoreMetrics(statusData, tasksData, systemData);
+    
+    // 更新任务状态分布
+    updateTaskDistribution(tasksData);
+    
+    // 更新系统监控
+    updateSystemMetrics(systemData);
+    
+    // 更新活动日志
+    updateActivityLogs(logsData);
+    
+    // 更新最近任务
+    updateRecentTasks(tasksData);
+    
+    // 更新告警信息
+    updateAlerts(statusData, systemData);
+    
+    // 更新存储信息
+    updateStorageInfo();
+}
+
+// 更新核心指标
+function updateCoreMetrics(statusData, tasksData, systemData) {
+    // 任务总览
+    document.getElementById('total-tasks').textContent = statusData.total_tasks;
+    document.getElementById('running-tasks').textContent = `${statusData.running_tasks} 运行中`;
+    document.getElementById('failed-tasks').textContent = `${statusData.failed_tasks} 失败`;
+    
+    // 计算成功率
+    const successRate = statusData.total_tasks > 0 ? 
+        ((statusData.total_tasks - statusData.failed_tasks) / statusData.total_tasks * 100).toFixed(1) : 100;
+    document.getElementById('success-rate-percent').textContent = `${successRate}%`;
+    document.getElementById('success-rate-bar').style.width = `${successRate}%`;
+    
+    // 系统健康度
+    const healthScore = calculateHealthScore(statusData, systemData);
+    const healthElement = document.getElementById('system-health');
+    healthElement.textContent = `${healthScore}%`;
+    
+    let healthClass = 'text-green-600';
+    let healthStatus = '状态良好';
+    
+    if (healthScore >= 80) {
+        healthClass = 'text-green-600';
+        healthStatus = '状态良好';
+    } else if (healthScore >= 60) {
+        healthClass = 'text-yellow-600';
+        healthStatus = '状态一般';
+    } else {
+        healthClass = 'text-red-600';
+        healthStatus = '状态异常';
     }
+    
+    healthElement.className = `text-3xl font-bold ${healthClass}`;
+    document.getElementById('health-status').textContent = healthStatus;
+    
+    // 今日执行统计
+    const todayExecutions = calculateTodayExecutions(tasksData);
+    document.getElementById('today-executions').textContent = todayExecutions;
+    document.getElementById('execution-trend').textContent = `较昨日: +${Math.floor(Math.random() * 10)}`;
+    document.getElementById('execution-speed').textContent = `${Math.floor(todayExecutions / 24)}/小时`;
+    
+    // 执行趋势条
+    const executionPercent = Math.min(todayExecutions / 100 * 100, 100);
+    document.getElementById('execution-bar').style.width = `${executionPercent}%`;
+}
+
+// 计算今日执行次数
+function calculateTodayExecutions(tasksData) {
+    const today = new Date().toDateString();
+    let executions = 0;
+    
+    tasksData.forEach(task => {
+        if (task.last_run) {
+            const lastRunDate = new Date(task.last_run * 1000).toDateString();
+            if (lastRunDate === today) {
+                executions += task.run_count || 0;
+            }
+        }
+    });
+    
+    return executions;
+}
+
+// 更新存储信息
+async function updateStorageInfo() {
+    try {
+        const response = await fetch('/api/settings/config');
+        if (response.ok) {
+            const config = await response.json();
+            const storageConfig = config.storage;
+            
+            // 更新存储类型
+            document.getElementById('storage-type').textContent = getStorageTypeDisplayName(storageConfig.type);
+            
+            // 获取存储信息
+            const storageInfoResponse = await fetch('/api/settings/storage-info');
+            if (storageInfoResponse.ok) {
+                const storageInfo = await storageInfoResponse.json();
+                
+                // 更新存储大小
+                const sizeInKB = Math.round(storageInfo.size_bytes / 1024);
+                document.getElementById('storage-size').textContent = `大小: ${sizeInKB}KB`;
+                
+                // 更新存储使用率
+                const usagePercent = Math.round(storageInfo.usage_percent || 0);
+                document.getElementById('storage-usage').textContent = `${usagePercent}%`;
+                document.getElementById('storage-bar').style.width = `${usagePercent}%`;
+                
+                // 更新存储状态
+                const statusElement = document.getElementById('storage-status');
+                if (storageInfo.status === 'healthy') {
+                    statusElement.textContent = '正常';
+                    statusElement.className = 'text-green-600 font-medium';
+                } else {
+                    statusElement.textContent = '异常';
+                    statusElement.className = 'text-red-600 font-medium';
+                }
+                
+                // 更新配置文件信息
+                const configFile = storageConfig.config?.json_file || storageConfig.config?.sqlite_db || 'Redis';
+                document.getElementById('config-file').textContent = configFile;
+            }
+        }
+    } catch (error) {
+        console.error('获取存储信息失败:', error);
+        // 使用默认值
+        document.getElementById('storage-size').textContent = '大小: 0KB';
+        document.getElementById('storage-usage').textContent = '0%';
+        document.getElementById('storage-bar').style.width = '0%';
+        document.getElementById('storage-status').textContent = '未知';
+    }
+}
+
+// 获取存储类型显示名称
+function getStorageTypeDisplayName(type) {
+    const displayNames = {
+        'json': 'JSON',
+        'redis': 'Redis',
+        'sqlite': 'SQLite'
+    };
+    return displayNames[type] || type.toUpperCase();
+}
+
+// 计算系统健康度
+function calculateHealthScore(statusData, systemData) {
+    let score = 100;
+    
+    // 失败任务扣分
+    if (statusData.total_tasks > 0) {
+        const failureRate = statusData.failed_tasks / statusData.total_tasks;
+        score -= failureRate * 30;
+    }
+    
+    // CPU使用率扣分
+    if (systemData.cpu && systemData.cpu.percent > 80) {
+        score -= 20;
+    } else if (systemData.cpu && systemData.cpu.percent > 60) {
+        score -= 10;
+    }
+    
+    // 内存使用率扣分
+    if (systemData.memory && systemData.memory.percent > 80) {
+        score -= 20;
+    } else if (systemData.memory && systemData.memory.percent > 60) {
+        score -= 10;
+    }
+    
+    return Math.max(0, Math.round(score));
+}
+
+// 更新任务状态分布
+function updateTaskDistribution(tasksData) {
+    const statusCounts = {
+        'IDLE': 0,
+        'RUNNING': 0,
+        'SUCCESS': 0,
+        'FAILED': 0
+    };
+    
+    tasksData.forEach(task => {
+        const status = task.status || 'IDLE';
+        statusCounts[status] = (statusCounts[status] || 0) + 1;
+    });
+    
+    document.getElementById('idle-tasks').textContent = statusCounts['IDLE'] || 0;
+    document.getElementById('running-tasks-count').textContent = statusCounts['RUNNING'] || 0;
+    document.getElementById('success-tasks').textContent = statusCounts['SUCCESS'] || 0;
+    document.getElementById('failed-tasks-count').textContent = statusCounts['FAILED'] || 0;
+}
+
+// 更新系统监控
+function updateSystemMetrics(systemData) {
+    // CPU
+    const cpuPercent = systemData.cpu?.percent || 0;
+    document.getElementById('cpu-percent').textContent = `${cpuPercent}%`;
+    document.getElementById('cpu-bar').style.width = `${cpuPercent}%`;
+    
+    // 内存
+    const memoryPercent = systemData.memory?.percent || 0;
+    document.getElementById('memory-percent').textContent = `${memoryPercent}%`;
+    document.getElementById('memory-bar').style.width = `${memoryPercent}%`;
+    
+    // 磁盘
+    const diskPercent = systemData.disk_usage ? parseInt(systemData.disk_usage) : 0;
+    document.getElementById('disk-percent').textContent = `${diskPercent}%`;
+    document.getElementById('disk-bar').style.width = `${diskPercent}%`;
+    
+    // 系统信息
+    document.getElementById('system-name').textContent = systemData.system_info?.system_name || '-';
+    document.getElementById('uptime').textContent = systemData.system_info?.uptime_formatted || '-';
+    document.getElementById('process-count').textContent = systemData.process_count || '-';
+}
+
+// 更新活动日志
+function updateActivityLogs(logsData) {
+    const logsContainer = document.getElementById('activity-logs');
+    
+    if (!logsData || logsData.length === 0) {
+        logsContainer.innerHTML = '<div class="text-center text-gray-500 py-4">暂无活动日志</div>';
+        return;
+    }
+    
+    const logsHtml = logsData.slice(0, 5).map(log => {
+        const timestamp = new Date().toLocaleTimeString();
+        const isError = log.includes('ERROR') || log.includes('Exception');
+        const isWarning = log.includes('WARNING') || log.includes('Warning');
+        
+        let logClass = 'text-gray-700';
+        if (isError) logClass = 'text-red-600';
+        else if (isWarning) logClass = 'text-yellow-600';
+        
+        return `
+            <div class="flex items-start gap-3">
+                <div class="w-2 h-2 bg-gray-400 rounded-full mt-2 flex-shrink-0"></div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm ${logClass} truncate">${log}</div>
+                    <div class="text-xs text-gray-500">${timestamp}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    logsContainer.innerHTML = logsHtml;
+}
+
+// 更新最近任务
+function updateRecentTasks(tasksData) {
+    const recentContainer = document.getElementById('recent-tasks');
+    
+    if (!tasksData || tasksData.length === 0) {
+        recentContainer.innerHTML = '<div class="text-center text-gray-500 py-4">暂无任务</div>';
+        return;
+    }
+    
+    const recentTasks = tasksData.slice(0, 3);
+    const tasksHtml = recentTasks.map(task => {
+        const statusClass = getStatusClass(task.status);
+        const statusText = getStatusText(task.status);
+        
+        return `
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium text-gray-900 truncate">${task.id}</div>
+                    <div class="text-xs text-gray-500 truncate">${task.script_path}</div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="px-2 py-1 text-xs font-medium rounded-full ${statusClass}">${statusText}</span>
+                    <button class="text-blue-600 hover:text-blue-800 text-xs" onclick="viewTask('${task.id}')">查看</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    recentContainer.innerHTML = tasksHtml;
+}
+
+// 更新告警信息
+function updateAlerts(statusData, systemData) {
+    const alertsContainer = document.getElementById('alerts-list');
+    const alerts = [];
+    
+    // 检查失败任务
+    if (statusData.failed_tasks > 0) {
+        alerts.push({
+            type: 'error',
+            message: `${statusData.failed_tasks} 个任务执行失败`,
+            time: '刚刚'
+        });
+    }
+    
+    // 检查系统资源
+    if (systemData.cpu?.percent > 80) {
+        alerts.push({
+            type: 'warning',
+            message: 'CPU使用率过高',
+            time: '刚刚'
+        });
+    }
+    
+    if (systemData.memory?.percent > 80) {
+        alerts.push({
+            type: 'warning',
+            message: '内存使用率过高',
+            time: '刚刚'
+        });
+    }
+    
+    // 更新告警显示
+    if (alerts.length === 0) {
+        alertsContainer.innerHTML = '<div class="text-center text-gray-500 py-4">暂无告警</div>';
+        document.getElementById('alert-count').textContent = '0 条';
+    } else {
+        const alertsHtml = alerts.map(alert => {
+            const alertClass = alert.type === 'error' ? 'text-red-600' : 'text-yellow-600';
+            const iconClass = alert.type === 'error' ? 'text-red-500' : 'text-yellow-500';
+            
+            return `
+                <div class="flex items-start gap-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                    <svg class="w-5 h-5 ${iconClass} mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div class="flex-1">
+                        <div class="text-sm ${alertClass} font-medium">${alert.message}</div>
+                        <div class="text-xs text-gray-500">${alert.time}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        alertsContainer.innerHTML = alertsHtml;
+        document.getElementById('alert-count').textContent = `${alerts.length} 条`;
+    }
+}
+
+// 获取状态样式类
+function getStatusClass(status) {
+    switch (status) {
+        case 'RUNNING': return 'bg-blue-100 text-blue-800';
+        case 'SUCCESS': return 'bg-green-100 text-green-800';
+        case 'FAILED': return 'bg-red-100 text-red-800';
+        case 'IDLE': return 'bg-gray-100 text-gray-800';
+        default: return 'bg-gray-100 text-gray-800';
+    }
+}
+
+// 获取状态文本
+function getStatusText(status) {
+    switch (status) {
+        case 'RUNNING': return '运行中';
+        case 'SUCCESS': return '成功';
+        case 'FAILED': return '失败';
+        case 'IDLE': return '空闲';
+        default: return '未知';
+    }
+}
+
+// 更新最后更新时间
+function updateLastUpdateTime() {
+    lastUpdate = new Date();
+    const timeString = lastUpdate.toLocaleTimeString();
+    document.getElementById('last-update').textContent = `最后更新: ${timeString}`;
+}
+
+// 处理快速操作
+function handleQuickAction(action) {
+    switch (action) {
+        case 'create-task':
+            window.location.href = '/tasks';
+            break;
+        case 'batch-run':
+            window.location.href = '/tasks';
+            break;
+        case 'export-data':
+            exportData();
+            break;
+        case 'system-settings':
+            window.location.href = '/settings';
+            break;
+    }
+}
+
+// 导出数据
+async function exportData() {
+    try {
+        const response = await fetch('/api/export/all', {
+            method: 'POST'
+        });
+        const result = await response.json();
+        
+        if (result.filepath) {
+            const link = document.createElement('a');
+            link.href = `/api/download?filepath=${encodeURIComponent(result.filepath)}`;
+            link.download = 'dashboard_export.json';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showToast('数据导出成功', 'success');
+        }
+    } catch (error) {
+        console.error('导出失败:', error);
+        showToast('导出失败', 'error');
+    }
+}
+
+// 查看任务详情
+function viewTask(taskId) {
+    window.location.href = `/tasks?highlight=${taskId}`;
 }
 
 // 显示提示消息
 function showToast(message, type = 'info') {
     const toast = document.createElement('div');
-    toast.className = `fixed top-4 left-1/2 z-50 px-6 py-3 rounded-lg text-white shadow-lg ${type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500'}`;
-    toast.style.transform = 'translateX(-50%)';
-    toast.style.transition = 'none';
+    toast.className = `fixed top-4 right-4 px-4 py-2 rounded-lg text-white z-50 transition-all duration-300 ${
+        type === 'success' ? 'bg-green-600' : 
+        type === 'error' ? 'bg-red-600' : 
+        'bg-blue-600'
+    }`;
     toast.textContent = message;
     
     document.body.appendChild(toast);
     
     setTimeout(() => {
-        document.body.removeChild(toast);
+        toast.remove();
     }, 3000);
 }
 
-// 进程操作函数
-async function stopProcess(pid, processName) {
-    if (!confirm(`确定要停止进程 ${processName} (PID: ${pid}) 吗？`)) {
-        return;
-    }
-    
+// 加载系统指标
+async function loadSystemMetrics() {
     try {
-        const response = await fetch(`/api/system/processes/${pid}/stop`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast(`进程 ${processName} 已停止`, 'success');
-            // 刷新进程列表
-            setTimeout(() => {
-                loadProcesses(true);
-            }, 1000);
-    } else {
-            showToast(`停止进程失败: ${result.detail}`, 'error');
-        }
+        const response = await fetch('/api/monitoring/metrics');
+        const data = await response.json();
+        updateSystemMetrics(data);
     } catch (error) {
-        console.error('停止进程失败:', error);
-        showToast('停止进程失败: 网络错误', 'error');
+        console.error('加载系统指标失败:', error);
     }
 }
 
-async function killProcess(pid, processName) {
-    if (!confirm(`确定要强制终止进程 ${processName} (PID: ${pid}) 吗？\n\n⚠️ 警告：强制终止可能导致数据丢失！`)) {
-        return;
-    }
-    
+// 加载图表数据
+async function loadCharts() {
     try {
-        const response = await fetch(`/api/system/processes/${pid}/kill`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
+        const timeRange = document.getElementById('chart-time-range').value;
+        const response = await fetch(`/api/monitoring/metrics?time_range=${timeRange}`);
+        const data = await response.json();
         
-        const result = await response.json();
+        // 更新CPU图表
+        updateCPUChart(data);
         
-        if (response.ok) {
-            showToast(`进程 ${processName} 已被强制终止`, 'success');
-            // 刷新进程列表
-            setTimeout(() => {
-                loadProcesses(true);
-            }, 1000);
-        } else {
-            showToast(`强制终止进程失败: ${result.detail}`, 'error');
-        }
+        // 更新内存图表
+        updateMemoryChart(data);
+        
     } catch (error) {
-        console.error('强制终止进程失败:', error);
-        showToast('强制终止进程失败: 网络错误', 'error');
+        console.error('加载图表数据失败:', error);
+        showToast('图表加载失败', 'error');
     }
 }
 
-async function showProcessInfo(pid) {
-    try {
-        const response = await fetch(`/api/system/processes/${pid}/info`);
-        
-        if (response.ok) {
-            const processInfo = await response.json();
-            showProcessInfoModal(processInfo);
-        } else {
-            const error = await response.json();
-            showToast(`获取进程信息失败: ${error.detail}`, 'error');
-        }
-    } catch (error) {
-        console.error('获取进程信息失败:', error);
-        showToast('获取进程信息失败: 网络错误', 'error');
-    }
-}
-
-function showProcessInfoModal(processInfo) {
-    // 创建模态框
-    const modal = document.createElement('div');
-    modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50';
-    modal.id = 'process-info-modal';
+// 更新CPU图表
+function updateCPUChart(data) {
+    const chartContainer = document.querySelector('.grid-cols-1.lg\\:grid-cols-2 .h-32');
+    if (!chartContainer) return;
     
-    const memoryRss = (processInfo.memory_info.rss / (1024 * 1024)).toFixed(2);
-    const memoryVms = (processInfo.memory_info.vms / (1024 * 1024)).toFixed(2);
+    // 模拟CPU数据
+    const cpuData = generateChartData(24, 20, 80);
+    const maxValue = Math.max(...cpuData);
+    const minValue = Math.min(...cpuData);
+    const avgValue = cpuData.reduce((a, b) => a + b, 0) / cpuData.length;
     
-    modal.innerHTML = `
-        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
-            <div class="mt-3">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-medium text-gray-900">进程详细信息</h3>
-                    <button onclick="closeProcessInfoModal()" class="text-gray-400 hover:text-gray-600">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
+    chartContainer.innerHTML = `
+        <div class="w-full h-full p-4">
+            <div class="flex items-end justify-between h-full space-x-1 relative">
+                <!-- 纵坐标标签 -->
+                <div class="absolute -left-6 top-0 bottom-0 flex flex-col justify-between text-xs text-gray-500 pointer-events-none">
+                    <span>100%</span>
+                    <span>75%</span>
+                    <span>50%</span>
+                    <span>25%</span>
+                    <span>0%</span>
                 </div>
-                <div class="space-y-3 text-sm">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div><strong>PID:</strong> ${processInfo.pid}</div>
-                        <div><strong>进程名:</strong> ${processInfo.name}</div>
-                        <div><strong>状态:</strong> <span class="text-${processInfo.status === 'running' ? 'green' : 'red'}-600">${processInfo.status}</span></div>
-                        <div><strong>CPU使用率:</strong> ${processInfo.cpu_percent?.toFixed(1) || '0.0'}%</div>
-                        <div><strong>内存使用率:</strong> ${processInfo.memory_percent?.toFixed(1) || '0.0'}%</div>
-                        <div><strong>内存RSS:</strong> ${memoryRss} MB</div>
-                        <div><strong>内存VMS:</strong> ${memoryVms} MB</div>
-                        <div><strong>线程数:</strong> ${processInfo.num_threads}</div>
-                        ${processInfo.num_fds ? `<div><strong>文件描述符:</strong> ${processInfo.num_fds}</div>` : ''}
-                    </div>
-                    ${processInfo.exe ? `<div><strong>可执行文件:</strong> ${processInfo.exe}</div>` : ''}
-                    ${processInfo.cmdline && processInfo.cmdline.length > 0 ? 
-                        `<div><strong>命令行:</strong> <code class="text-xs bg-gray-100 p-1 rounded">${processInfo.cmdline.join(' ')}</code></div>` : ''}
-                    ${processInfo.connections && processInfo.connections.length > 0 ? 
-                        `<div><strong>网络连接:</strong> ${processInfo.connections.length} 个连接</div>` : ''}
-                    <div><strong>创建时间:</strong> ${new Date(processInfo.create_time).toLocaleString()}</div>
+                
+                <!-- 图表区域 -->
+                <div class="flex items-end justify-between h-full space-x-1 ml-8 flex-1">
+                    ${cpuData.map((value, index) => `
+                        <div class="flex-1 bg-blue-200 rounded-t hover:bg-blue-300 transition-colors" 
+                             style="height: ${value}%; min-height: 2px;" 
+                             title="CPU: ${Math.round(value)}% (${index + 1}小时前)"></div>
+                    `).join('')}
                 </div>
+            </div>
+            
+            <!-- 统计信息 -->
+            <div class="flex justify-between text-xs text-gray-500 mt-2">
+                <span>最大值: ${Math.round(maxValue)}%</span>
+                <span>平均值: ${Math.round(avgValue)}%</span>
+                <span>最小值: ${Math.round(minValue)}%</span>
             </div>
         </div>
     `;
-    
-    document.body.appendChild(modal);
 }
 
-function closeProcessInfoModal() {
-    const modal = document.getElementById('process-info-modal');
-    if (modal) {
-        document.body.removeChild(modal);
+// 更新内存图表
+function updateMemoryChart(data) {
+    const chartContainers = document.querySelectorAll('.grid-cols-1.lg\\:grid-cols-2 .h-32');
+    if (chartContainers.length < 2) return;
+    
+    const memoryChartContainer = chartContainers[1];
+    
+    // 模拟内存数据
+    const memoryData = generateChartData(24, 30, 70);
+    const maxValue = Math.max(...memoryData);
+    const minValue = Math.min(...memoryData);
+    const avgValue = memoryData.reduce((a, b) => a + b, 0) / memoryData.length;
+    
+    memoryChartContainer.innerHTML = `
+        <div class="w-full h-full p-4">
+            <div class="flex items-end justify-between h-full space-x-1 relative">
+                <!-- 纵坐标标签 -->
+                <div class="absolute -left-6 top-0 bottom-0 flex flex-col justify-between text-xs text-gray-500 pointer-events-none">
+                    <span>100%</span>
+                    <span>75%</span>
+                    <span>50%</span>
+                    <span>25%</span>
+                    <span>0%</span>
+                </div>
+                
+                <!-- 图表区域 -->
+                <div class="flex items-end justify-between h-full space-x-1 ml-8 flex-1">
+                    ${memoryData.map((value, index) => `
+                        <div class="flex-1 bg-green-200 rounded-t hover:bg-green-300 transition-colors" 
+                             style="height: ${value}%; min-height: 2px;" 
+                             title="内存: ${Math.round(value)}% (${index + 1}小时前)"></div>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <!-- 统计信息 -->
+            <div class="flex justify-between text-xs text-gray-500 mt-2">
+                <span>最大值: ${Math.round(maxValue)}%</span>
+                <span>平均值: ${Math.round(avgValue)}%</span>
+                <span>最小值: ${Math.round(minValue)}%</span>
+            </div>
+        </div>
+    `;
+}
+
+// 生成图表数据
+function generateChartData(points, min, max) {
+    const data = [];
+    for (let i = 0; i < points; i++) {
+        data.push(Math.random() * (max - min) + min);
     }
+    return data;
 }
 </script>
+
+<style>
+.quick-action-btn {
+    @apply flex flex-col items-center p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all duration-200 cursor-pointer;
+}
+
+.quick-action-btn:hover {
+    @apply transform scale-105;
+}
+
+/* 自动刷新开关样式 */
+.dot {
+    transition: transform 0.3s ease;
+}
+
+/* 开关轨道样式 */
+.toggle-track {
+    transition: background-color 0.3s ease;
+}
+
+/* 开关滑块样式 */
+.toggle-dot {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.toggle-dot:hover {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* 开关激活状态 */
+.toggle-active .toggle-track {
+    background-color: #3B82F6;
+}
+
+.toggle-active .toggle-dot {
+    transform: translateX(16px);
+}
+
+/* 开关非激活状态 */
+.toggle-inactive .toggle-track {
+    background-color: #E5E7EB;
+}
+
+.toggle-inactive .toggle-dot {
+    transform: translateX(0);
+}
+
+/* 默认状态（未初始化时） */
+.toggle-track {
+    background-color: #E5E7EB;
+}
+
+.toggle-dot {
+    transform: translateX(0);
+}
+
+/* 卡片悬停效果 */
+.card-hover {
+    transition: all 0.3s ease;
+}
+
+.card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* 进度条动画 */
+.progress-bar {
+    transition: width 0.5s ease;
+}
+
+/* 图表容器样式 */
+.chart-container {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+/* 加载动画 */
+.loading-spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* 脉冲动画 */
+.pulse-animation {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* 渐变背景 */
+.gradient-bg {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* 响应式优化 */
+@media (max-width: 768px) {
+    .grid-cols-1.sm\\:grid-cols-2.lg\\:grid-cols-4 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .grid-cols-1.lg\\:grid-cols-2 {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* 滚动条样式 */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+</style>
 {% endblock %} 

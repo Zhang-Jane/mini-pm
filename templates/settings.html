@@ -8,6 +8,33 @@
 <div class="page-content">
   <div class="w-full h-full">
     
+    <!-- 系统概览 -->
+    <div class="bg-white rounded-lg shadow-sm mb-4 md:mb-6">
+      <div class="p-4 md:p-6 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-800">系统概览</h3>
+        <p class="text-sm text-gray-600 mt-1">当前系统状态和配置信息</p>
+      </div>
+      <div class="p-4 md:p-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="text-center p-4 bg-blue-50 rounded-lg">
+            <div class="text-2xl font-bold text-blue-600" id="current-storage-type">JSON</div>
+            <div class="text-sm text-blue-700">存储类型</div>
+          </div>
+          <div class="text-center p-4 bg-green-50 rounded-lg">
+            <div class="text-2xl font-bold text-green-600" id="storage-status-indicator">正常</div>
+            <div class="text-sm text-green-700">存储状态</div>
+          </div>
+          <div class="text-center p-4 bg-orange-50 rounded-lg">
+            <div class="text-2xl font-bold text-orange-600" id="config-file-size">0KB</div>
+            <div class="text-sm text-orange-700">配置大小</div>
+          </div>
+          <div class="text-center p-4 bg-purple-50 rounded-lg">
+            <div class="text-2xl font-bold text-purple-600" id="last-update-time">--</div>
+            <div class="text-sm text-purple-700">最后更新</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
   <!-- 存储配置 -->
   <div class="bg-white rounded-lg shadow-sm mb-4 md:mb-6">
@@ -243,6 +270,9 @@
     // 加载配置
     loadStorageType();
     
+    // 加载系统概览
+    loadSystemOverview();
+    
     // 存储类型选择事件监听
     document.getElementById('storage-type-select').addEventListener('change', function() {
       updateStorageConfig(this.value);
@@ -251,8 +281,62 @@
     
     // 添加配置保存事件监听
     addConfigSaveListeners();
+    
+    // 定时更新系统概览
+    setInterval(loadSystemOverview, 30000); // 每30秒更新一次
   });
   
+  // 加载系统概览
+  async function loadSystemOverview() {
+    try {
+      // 获取系统配置
+      const configResponse = await fetch('/api/settings/config');
+      if (configResponse.ok) {
+        const config = await configResponse.json();
+        
+        // 更新存储类型
+        const storageType = config.storage.type;
+        document.getElementById('current-storage-type').textContent = getStorageTypeDisplayName(storageType);
+        
+        // 获取存储信息
+        const storageInfoResponse = await fetch('/api/settings/storage-info');
+        if (storageInfoResponse.ok) {
+          const storageInfo = await storageInfoResponse.json();
+          
+          // 更新存储状态
+          const statusElement = document.getElementById('storage-status-indicator');
+          if (storageInfo.status === 'healthy') {
+            statusElement.textContent = '正常';
+            statusElement.className = 'text-2xl font-bold text-green-600';
+          } else {
+            statusElement.textContent = '异常';
+            statusElement.className = 'text-2xl font-bold text-red-600';
+          }
+          
+          // 更新配置文件大小
+          const sizeInKB = Math.round(storageInfo.size_bytes / 1024);
+          document.getElementById('config-file-size').textContent = `${sizeInKB}KB`;
+        }
+        
+        // 更新最后更新时间
+        const now = new Date();
+        document.getElementById('last-update-time').textContent = now.toLocaleTimeString();
+      }
+    } catch (error) {
+      console.error('加载系统概览失败:', error);
+    }
+  }
+  
+  // 获取存储类型显示名称
+  function getStorageTypeDisplayName(type) {
+    const displayNames = {
+      'json': 'JSON',
+      'redis': 'Redis',
+      'sqlite': 'SQLite'
+    };
+    return displayNames[type] || type.toUpperCase();
+  }
+
   // 加载存储类型配置
   async function loadStorageType() {
     try {
@@ -580,6 +664,23 @@
         showToast('清空系统日志失败', 'error');
       }
     }
+  }
+  
+  // 显示提示消息
+  function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `fixed top-4 right-4 px-4 py-2 rounded-lg text-white z-50 transition-all duration-300 ${
+      type === 'success' ? 'bg-green-600' : 
+      type === 'error' ? 'bg-red-600' : 
+      'bg-blue-600'
+    }`;
+    toast.textContent = message;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.remove();
+    }, 3000);
   }
 </script>
 {% endblock %}
