@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -2169,28 +2169,125 @@ async def health_check() -> Dict[str, str]:
     """健康检查"""
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
+@app.post("/api/upload")
+async def upload_file(file: UploadFile, remote_path: str = Form(...)):
+    """上传文件"""
+    try:
+        # 安全检查：确保远程路径不为空
+        if not remote_path or remote_path.strip() == '':
+            raise HTTPException(status_code=400, detail="文件路径不能为空")
+        
+        # 去除首尾空格
+        remote_path = remote_path.strip()
+        
+        # 检查路径遍历攻击
+        if '..' in remote_path:
+            raise HTTPException(status_code=400, detail="路径中不能包含 .. 等特殊字符")
+        
+        # 定义需要管理员权限的目录（禁止访问）
+        admin_dirs = [
+            '/etc', '/var', '/usr', '/bin', '/sbin', '/lib', '/lib64',
+            '/root', '/boot', '/dev', '/proc', '/sys',
+            '/System', '/Applications', '/Library',
+            'C:\\', 'D:\\', 'E:\\', 'F:\\', 'G:\\', 'H:\\', 'I:\\', 'J:\\', 'K:\\', 'L:\\', 'M:\\', 'N:\\', 'O:\\', 'P:\\', 'Q:\\', 'R:\\', 'S:\\', 'T:\\', 'U:\\', 'V:\\', 'W:\\', 'X:\\', 'Y:\\', 'Z:\\'
+        ]
+        
+        # 检查是否访问管理员目录
+        normalized_path = os.path.normpath(remote_path)
+        for admin_dir in admin_dirs:
+            if normalized_path.startswith(admin_dir):
+                raise HTTPException(status_code=403, detail=f"禁止访问系统目录: {admin_dir}")
+        
+        # 标准化远程路径
+        if not remote_path.startswith('./') and not remote_path.startswith('/'):
+            remote_path = f'./{remote_path}'
+        
+        # 确保目标目录存在
+        target_dir = os.path.dirname(remote_path)
+        if target_dir and not os.path.exists(target_dir):
+            try:
+                os.makedirs(target_dir, exist_ok=True)
+            except PermissionError:
+                raise HTTPException(status_code=403, detail=f"没有权限创建目录: {target_dir}")
+        
+        # 保存文件
+        try:
+            with open(remote_path, 'wb') as f:
+                content = await file.read()
+                f.write(content)
+        except PermissionError:
+            raise HTTPException(status_code=403, detail=f"没有权限写入文件: {remote_path}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"写入文件失败: {str(e)}")
+        
+        return JSONResponse({
+            "message": "文件上传成功",
+            "filename": file.filename,
+            "remote_path": remote_path,
+            "size": len(content)
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"文件上传失败: {str(e)}")
+
 @app.get("/api/download")
 async def download_file(filepath: str):
     """下载文件"""
     try:
-        # 安全检查：确保文件路径在exports目录内
-        if not filepath.startswith('./exports/') and not filepath.startswith('exports/'):
-            raise HTTPException(status_code=400, detail="无效的文件路径")
+        # 安全检查：确保文件路径不为空
+        if not filepath or filepath.strip() == '':
+            raise HTTPException(status_code=400, detail="文件路径不能为空")
+        
+        # 去除首尾空格
+        filepath = filepath.strip()
+        
+        # 检查路径遍历攻击
+        if '..' in filepath:
+            raise HTTPException(status_code=400, detail="路径中不能包含 .. 等特殊字符")
+        
+        # 定义需要管理员权限的目录（禁止访问）
+        admin_dirs = [
+            '/etc', '/var', '/usr', '/bin', '/sbin', '/lib', '/lib64',
+            '/root', '/boot', '/dev', '/proc', '/sys',
+            '/System', '/Applications', '/Library',
+            'C:\\', 'D:\\', 'E:\\', 'F:\\', 'G:\\', 'H:\\', 'I:\\', 'J:\\', 'K:\\', 'L:\\', 'M:\\', 'N:\\', 'O:\\', 'P:\\', 'Q:\\', 'R:\\', 'S:\\', 'T:\\', 'U:\\', 'V:\\', 'W:\\', 'X:\\', 'Y:\\', 'Z:\\'
+        ]
+        
+        # 检查是否访问管理员目录
+        normalized_path = os.path.normpath(filepath)
+        for admin_dir in admin_dirs:
+            if normalized_path.startswith(admin_dir):
+                raise HTTPException(status_code=403, detail=f"禁止访问系统目录: {admin_dir}")
         
         # 标准化文件路径
-        if filepath.startswith('./'):
-            filepath = filepath[2:]
+        if not filepath.startswith('./') and not filepath.startswith('/'):
+            filepath = f'./{filepath}'
+        
+        # 清理路径中的多余的 ./
+        import re
+        # 移除路径中多余的 ./
+        filepath = re.sub(r'\./\./', './', filepath)
+        filepath = re.sub(r'\./\.\./', './', filepath)
+        # 移除路径中的 ./ 和 ../
+        filepath = re.sub(r'/[.]/', '/', filepath)
+        filepath = re.sub(r'/[.][.]/', '/', filepath)
         
         # 检查文件是否存在
         if not os.path.exists(filepath):
-            raise HTTPException(status_code=404, detail="文件不存在")
+            raise HTTPException(status_code=404, detail=f"文件不存在: {filepath}")
         
         # 获取文件名
         filename = os.path.basename(filepath)
         
         # 读取文件内容
-        with open(filepath, 'rb') as f:
-            content = f.read()
+        try:
+            with open(filepath, 'rb') as f:
+                content = f.read()
+        except PermissionError:
+            raise HTTPException(status_code=403, detail=f"没有权限读取文件: {filepath}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"读取文件失败: {str(e)}")
         
         # 返回文件下载响应
         from fastapi.responses import Response
@@ -2201,6 +2298,9 @@ async def download_file(filepath: str):
                 'Content-Disposition': f'attachment; filename="{filename}"'
             }
         )
+    except HTTPException:
+        # 重新抛出HTTPException
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"下载文件失败: {str(e)}")
 
