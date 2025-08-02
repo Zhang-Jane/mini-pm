@@ -640,23 +640,125 @@ async def websocket_terminal(websocket: WebSocket, session_id: str):
         
         system = platform.system()
         if system == "Windows":
-            # Windows使用cmd
-            process = subprocess.Popen(
-                ["cmd.exe"],
-                stdin=slave,
-                stdout=slave,
-                stderr=slave,
-                start_new_session=True
-            )
+            # Windows使用PowerShell或cmd
+            import shutil
+            if shutil.which("powershell.exe"):
+                # 使用PowerShell，支持更好的ANSI和UTF-8
+                process = subprocess.Popen(
+                    ["powershell.exe", "-NoLogo", "-Command", "-"],
+                    stdin=slave,
+                    stdout=slave,
+                    stderr=slave,
+                    start_new_session=True,
+                    env={
+                        **os.environ,
+                        "TERM": "xterm-256color",
+                        "POWERSHELL_TELEMETRY_OPTOUT": "1",
+                        "POWERSHELL_UPDATECHECK": "Off"
+                    }
+                )
+            else:
+                # 回退到cmd
+                process = subprocess.Popen(
+                    ["cmd.exe"],
+                    stdin=slave,
+                    stdout=slave,
+                    stderr=slave,
+                    start_new_session=True,
+                    env={
+                        **os.environ,
+                        "TERM": "xterm-256color"
+                    }
+                )
         else:
-            # Linux/macOS使用bash
-            process = subprocess.Popen(
-                ["/bin/bash"],
-                stdin=slave,
-                stdout=slave,
-                stderr=slave,
-                start_new_session=True
-            )
+            # Linux/Unix系统
+            import shutil
+            shell_path = None
+            
+            # 检测系统类型和可用shell
+            if system == "Darwin":  # macOS
+                # 优先使用zsh（macOS默认）
+                if shutil.which("zsh"):
+                    shell_path = "zsh"
+                elif shutil.which("bash"):
+                    shell_path = "bash"
+                else:
+                    shell_path = "/bin/sh"
+            else:  # Linux
+                # 优先使用bash（Linux默认）
+                if shutil.which("bash"):
+                    shell_path = "bash"
+                elif shutil.which("zsh"):
+                    shell_path = "zsh"
+                else:
+                    shell_path = "/bin/sh"
+            
+            # 根据系统设置不同的环境变量
+            env = os.environ.copy()
+            env.update({
+                "TERM": "xterm-256color",
+                "LANG": "en_US.UTF-8",
+                "LC_ALL": "en_US.UTF-8",
+                "LC_CTYPE": "en_US.UTF-8",
+                "LC_MESSAGES": "en_US.UTF-8",
+                "LC_MONETARY": "en_US.UTF-8",
+                "LC_NUMERIC": "en_US.UTF-8",
+                "LC_TIME": "en_US.UTF-8",
+                "LC_COLLATE": "en_US.UTF-8",
+            })
+            
+            # 根据shell类型设置特定环境变量
+            if shell_path == "zsh":
+                env.update({
+                    "BASH_ENV": "",
+                    "ENV": "",
+                    "ZDOTDIR": "",
+                    "ZSHRC": "",
+                    "PROMPT": "%n@%m:%1~$ ",
+                    "RPROMPT": "",
+                    "PS1": "%n@%m:%1~$ ",
+                    "PS2": "> ",
+                    "PS3": "? ",
+                    "PS4": "+ "
+                })
+            elif shell_path == "bash":
+                env.update({
+                    "BASH_ENV": "",
+                    "ENV": "",
+                    "PS1": "\\u@\\h:\\w\\$ ",
+                    "PS2": "> ",
+                    "PS3": "? ",
+                    "PS4": "+ "
+                })
+            
+            # 启动shell进程
+            if shell_path == "zsh":
+                process = subprocess.Popen(
+                    [shell_path, "--no-rcs", "--no-globalrcs"],
+                    stdin=slave,
+                    stdout=slave,
+                    stderr=slave,
+                    start_new_session=True,
+                    env=env
+                )
+            elif shell_path == "bash":
+                process = subprocess.Popen(
+                    [shell_path, "--norc", "--noprofile"],
+                    stdin=slave,
+                    stdout=slave,
+                    stderr=slave,
+                    start_new_session=True,
+                    env=env
+                )
+            else:
+                process = subprocess.Popen(
+                    [shell_path],
+                    stdin=slave,
+                    stdout=slave,
+                    stderr=slave,
+                    start_new_session=True,
+                    env=env
+                )
         
         # 存储会话信息
         active_terminals[session_id] = {
@@ -801,13 +903,46 @@ async def create_terminal_session(session_id: str) -> Dict[str, Any]:
                 start_new_session=True
             )
         else:
-            # Linux/macOS使用bash
+            # 检测并使用合适的shell
+            import shutil
+            shell_path = None
+            
+            # 优先使用zsh（macOS默认）
+            if shutil.which("zsh"):
+                shell_path = "zsh"
+            elif shutil.which("bash"):
+                shell_path = "bash"
+            else:
+                shell_path = "/bin/sh"
+            
+            # 设置环境变量以避免配置文件中的错误
+            env = os.environ.copy()
+            env.update({
+                "TERM": "xterm-256color",
+                "LANG": "en_US.UTF-8",
+                "LC_ALL": "en_US.UTF-8",
+                # 禁用可能导致错误的shell配置
+                "BASH_ENV": "",
+                "ENV": "",
+                "ZDOTDIR": "",
+                "ZSHRC": "",
+                # 禁用zsh的复杂提示符
+                "PROMPT": "%n@%m:%1~$ ",
+                "RPROMPT": "",
+                "PS1": "%n@%m:%1~$ ",
+                "PS2": "> ",
+                "PS3": "? ",
+                "PS4": "+ "
+            })
+            
+            # 启动shell进程，使用非交互模式避免配置文件问题
             process = subprocess.Popen(
-                ["/bin/bash"],
+                [shell_path, "--no-rcs"],
                 stdin=slave,
                 stdout=slave,
                 stderr=slave,
-                start_new_session=True
+                start_new_session=True,
+                env=env
             )
         
         # 存储会话信息
