@@ -590,6 +590,86 @@ async def batch_delete_tasks(request: BatchTaskRequest) -> JSONResponse:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"批量删除失败: {str(e)}")
 
+@app.post("/api/tasks/batch/kill")
+async def batch_kill_tasks(request: BatchTaskRequest) -> JSONResponse:
+    """批量停止任务"""
+    if not task_service:
+        raise HTTPException(status_code=500, detail="任务服务未初始化")
+    
+    try:
+        success_count = 0
+        failed_tasks = []
+        
+        for task_id in request.task_ids:
+            try:
+                # 检查任务是否存在
+                task = await task_store.get_task(task_id)
+                if not task:
+                    failed_tasks.append({"task_id": task_id, "error": "任务不存在"})
+                    continue
+                
+                # 获取任务状态
+                status = task_status.get(task_id, {})
+                if status.get("status") != "RUNNING":
+                    failed_tasks.append({"task_id": task_id, "error": "任务当前未在运行"})
+                    continue
+                
+                # 获取进程ID
+                process_id = status.get("process_id")
+                if not process_id:
+                    failed_tasks.append({"task_id": task_id, "error": "无法获取任务进程ID"})
+                    continue
+                
+                # 尝试终止进程
+                try:
+                    import psutil
+                    process = psutil.Process(process_id)
+                    process.terminate()  # 先尝试优雅终止
+                    
+                    # 等待进程结束
+                    try:
+                        process.wait(timeout=5)
+                    except psutil.TimeoutExpired:
+                        # 如果超时，强制杀死进程
+                        process.kill()
+                        process.wait()
+                    
+                    # 更新任务状态
+                    task_status[task_id] = {
+                        "status": "STOPPED",
+                        "last_stop": time.time(),
+                        "process_id": None
+                    }
+                    
+                    success_count += 1
+                    
+                except psutil.NoSuchProcess:
+                    # 进程已经不存在
+                    task_status[task_id] = {
+                        "status": "STOPPED",
+                        "last_stop": time.time(),
+                        "process_id": None
+                    }
+                    success_count += 1
+                    
+                except Exception as e:
+                    failed_tasks.append({"task_id": task_id, "error": f"停止任务失败: {str(e)}"})
+                    
+            except Exception as e:
+                failed_tasks.append({"task_id": task_id, "error": f"操作失败: {str(e)}"})
+        
+        message = f"成功停止 {success_count} 个任务"
+        if failed_tasks:
+            message += f"，失败 {len(failed_tasks)} 个任务"
+        
+        return JSONResponse({
+            "message": message,
+            "success_count": success_count,
+            "failed_tasks": failed_tasks
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"批量停止失败: {str(e)}")
+
 @app.post("/api/tasks/batch/clear-history")
 async def batch_clear_task_history(request: BatchTaskRequest) -> JSONResponse:
     """批量清空任务历史"""
@@ -1150,6 +1230,66 @@ async def toggle_task(task_id: str) -> JSONResponse:
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@app.post("/api/tasks/{task_id}/kill")
+async def kill_task(task_id: str) -> JSONResponse:
+    """强制停止任务进程"""
+    if not task_service:
+        raise HTTPException(status_code=500, detail="任务服务未初始化")
+    
+    try:
+        # 检查任务是否存在
+        task = await task_store.get_task(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="任务不存在")
+        
+        # 获取任务状态
+        status = task_status.get(task_id, {})
+        if status.get("status") != "RUNNING":
+            raise HTTPException(status_code=400, detail="任务当前未在运行")
+        
+        # 获取进程ID
+        process_id = status.get("process_id")
+        if not process_id:
+            raise HTTPException(status_code=400, detail="无法获取任务进程ID")
+        
+        # 尝试终止进程
+        try:
+            import psutil
+            process = psutil.Process(process_id)
+            process.terminate()  # 先尝试优雅终止
+            
+            # 等待进程结束
+            try:
+                process.wait(timeout=5)
+            except psutil.TimeoutExpired:
+                # 如果超时，强制杀死进程
+                process.kill()
+                process.wait()
+            
+            # 更新任务状态
+            task_status[task_id] = {
+                "status": "STOPPED",
+                "last_stop": time.time(),
+                "process_id": None
+            }
+            
+            return JSONResponse({"message": f"任务 {task_id} 已停止"})
+            
+        except psutil.NoSuchProcess:
+            # 进程已经不存在
+            task_status[task_id] = {
+                "status": "STOPPED",
+                "last_stop": time.time(),
+                "process_id": None
+            }
+            return JSONResponse({"message": f"任务 {task_id} 进程已结束"})
+            
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"停止任务失败: {str(e)}")
+            
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @app.get("/api/tasks/{task_id}/status")
 async def get_task_status(task_id: str) -> Dict[str, Any]:
     """获取任务详细状态"""
@@ -1170,7 +1310,8 @@ async def get_task_status(task_id: str) -> Dict[str, Any]:
         "last_error": status.get("last_error"),
         "next_run": status.get("next_run"),
         "run_count": status.get("run_count", 0),
-        "error_count": status.get("error_count", 0)
+        "error_count": status.get("error_count", 0),
+        "process_id": status.get("process_id")
     }
 
 @app.get("/api/tasks/{task_id}/history")

@@ -153,6 +153,16 @@ class TaskService:
                 env=env
             )
 
+            # 保存进程ID到任务状态
+            async with self.task_lock:
+                current_status = self.task_status.get(task_id, {})
+                current_status.update({
+                    "status": "RUNNING",
+                    "process_id": process.pid,
+                    "start_time": time.time()
+                })
+                self.task_status[task_id] = current_status
+
             # 读取输出
             output_lines = []
             while True:
@@ -182,7 +192,8 @@ class TaskService:
                         "last_run": time.time(),
                         "duration": f"{duration:.2f}秒",
                         "run_count": run_count,
-                        "output": output_lines[-10:] if output_lines else []  # 保留最后10行输出
+                        "output": output_lines[-10:] if output_lines else [],  # 保留最后10行输出
+                        "process_id": None  # 清除进程ID
                     }
             else:
                 # 任务失败
@@ -203,7 +214,8 @@ class TaskService:
                         "run_count": run_count,
                         "output": output_lines[-10:] if output_lines else [],
                         "error_detail": error_detail,
-                        "error_timestamp": end_time.strftime('%Y-%m-%d %H:%M:%S')
+                        "error_timestamp": end_time.strftime('%Y-%m-%d %H:%M:%S'),
+                        "process_id": None  # 清除进程ID
                     }
 
         except Exception as e:
@@ -223,7 +235,8 @@ class TaskService:
                     "run_count": run_count,
                     "output": [],
                     "error_detail": error_detail,
-                    "error_timestamp": end_time.strftime('%Y-%m-%d %H:%M:%S')
+                    "error_timestamp": end_time.strftime('%Y-%m-%d %H:%M:%S'),
+                    "process_id": None  # 清除进程ID
                 }
 
         finally:
