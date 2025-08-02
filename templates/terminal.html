@@ -41,11 +41,11 @@
                     </svg>
                     终端信息
                 </button>
-                <button id="toggle-debug" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center">
+                <button id="force-clean" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                     </svg>
-                    调试模式
+                    强制清理
                 </button>
             </div>
         </div>
@@ -171,7 +171,7 @@
         </div>
 
         <!-- 终端容器 -->
-        <div id="terminal-container" class="relative p-4 bg-gray-900">
+        <div id="terminal-container" class="relative p-4 bg-gray-900" style="height: 600px; overflow: hidden;">
             <!-- xterm终端将在这里渲染 -->
         </div>
     </div>
@@ -276,11 +276,18 @@
     overflow: hidden;
     border: 1px solid #30363d;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
 .terminal-instance .xterm {
     padding: 1rem;
     background-color: #0d1117;
+    height: 100%;
+    width: 100%;
+    flex: 1;
 }
 
 .terminal-instance .xterm-viewport {
@@ -514,9 +521,9 @@
                 this.showTerminalInfo();
             });
 
-            // 调试模式按钮
-            document.getElementById('toggle-debug').addEventListener('click', () => {
-                this.toggleDebugMode();
+            // 强制清理按钮
+            document.getElementById('force-clean').addEventListener('click', () => {
+                this.forceCleanTerminal();
             });
 
             // 启动状态监控
@@ -608,8 +615,8 @@
         }
 
         initializeTerminal() {
-            // 自动创建第一个终端
-            this.createTerminal();
+            // 不自动创建终端，由用户手动创建
+            // this.createTerminal();
         }
 
         createTerminal() {
@@ -631,7 +638,7 @@
             terminalContainer.id = `terminal-${terminalId}`;
             terminalContainer.className = 'terminal-instance';
             terminalContainer.style.display = 'none';
-            terminalContainer.style.height = '500px';
+            terminalContainer.style.height = '100%';
             terminalContainer.style.width = '100%';
 
             document.getElementById('terminal-container').appendChild(terminalContainer);
@@ -685,7 +692,7 @@
 
             tab.innerHTML = `
             <span class="text-sm font-medium text-gray-700">终端 ${this.terminalCounter}</span>
-            <button class="ml-2 text-gray-500 hover:text-red-600 transition-colors" onclick="terminalManager.closeTerminal('${terminalId}')">
+            <button class="ml-2 text-gray-500 hover:text-red-600 transition-colors" data-terminal-id="${terminalId}">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
@@ -694,6 +701,13 @@
 
             tab.addEventListener('click', () => {
                 this.activateTerminal(terminalId);
+            });
+
+            // 添加关闭按钮事件监听器
+            const closeButton = tab.querySelector('button');
+            closeButton.addEventListener('click', (e) => {
+                e.stopPropagation(); // 防止触发标签页点击事件
+                this.closeTerminal(terminalId);
             });
 
             tabsContainer.appendChild(tab);
@@ -713,7 +727,14 @@
             // 显示选中的终端
             const terminalInfo = this.terminals.get(terminalId);
             if (terminalInfo) {
-                terminalInfo.container.style.display = 'block';
+                // 清除提示信息
+                const container = document.getElementById('terminal-container');
+                const noTerminalMessage = container.querySelector('.no-terminal-message');
+                if (noTerminalMessage) {
+                    noTerminalMessage.remove();
+                }
+                
+                terminalInfo.container.style.display = 'flex';
                 terminalInfo.fitAddon.fit();
                 terminalInfo.terminal.focus();
 
@@ -758,7 +779,6 @@
                             'export TERM=xterm-256color',
                             'export LANG=en_US.UTF-8',
                             'export LC_ALL=en_US.UTF-8',
-                            'export PS1="\\u@\\h:\\w\\$ "',
                             'stty -echo',
                             'clear'
                         ];
@@ -768,7 +788,6 @@
                             'export TERM=xterm-256color',
                             'export LANG=en_US.UTF-8',
                             'export LC_ALL=en_US.UTF-8',
-                            'export PS1="\\u@\\h:\\w\\$ "',
                             'stty -echo',
                             'clear'
                         ];
@@ -884,7 +903,7 @@
             });
 
             // 添加右键菜单
-            this.addContextMenu(terminalContainer, terminalId);
+            this.addContextMenu(terminalInfo.container, terminalId);
         }
 
         // 添加右键菜单
@@ -906,39 +925,39 @@
             const menuHtml = `
                 <div id="terminal-context-menu" class="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1" 
                      style="left: ${event.pageX}px; top: ${event.pageY}px;">
-                    <div class="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer" onclick="terminalManager.copyFromTerminal()">
+                    <div class="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer" data-action="copy">
                         <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 4h8m-8-4v4m0 0l3-3m-3 3l3 3"></path>
                         </svg>
                         复制
                     </div>
-                    <div class="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer" onclick="terminalManager.pasteToTerminal()">
+                    <div class="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer" data-action="paste">
                         <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
                         粘贴
                     </div>
                     <div class="border-t border-gray-200 my-1"></div>
-                    <div class="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer" onclick="terminalManager.clearActiveTerminal()">
+                    <div class="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer" data-action="clear">
                         <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                         </svg>
                         清空终端
                     </div>
-                    <div class="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer" onclick="terminalManager.resetTerminalDisplay()">
+                    <div class="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer" data-action="reset">
                         <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                         </svg>
                         重置显示
                     </div>
-                    <div class="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer" onclick="terminalManager.showSearchBox()">
+                    <div class="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer" data-action="search">
                         <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                         </svg>
                         搜索
                     </div>
                     <div class="border-t border-gray-200 my-1"></div>
-                    <div class="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer" onclick="terminalManager.exportTerminalOutput()">
+                    <div class="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer" data-action="export">
                         <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
@@ -948,6 +967,39 @@
             `;
 
             document.body.insertAdjacentHTML('beforeend', menuHtml);
+
+            // 添加右键菜单事件处理
+            const menu = document.getElementById('terminal-context-menu');
+            menu.addEventListener('click', (e) => {
+                const action = e.target.closest('[data-action]')?.getAttribute('data-action');
+                if (action) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    switch (action) {
+                        case 'copy':
+                            this.copyFromTerminal();
+                            break;
+                        case 'paste':
+                            this.pasteToTerminal();
+                            break;
+                        case 'clear':
+                            this.clearActiveTerminal();
+                            break;
+                        case 'reset':
+                            this.resetTerminalDisplay();
+                            break;
+                        case 'search':
+                            this.showSearchBox();
+                            break;
+                        case 'export':
+                            this.exportTerminalOutput();
+                            break;
+                    }
+                    
+                    menu.remove();
+                }
+            });
 
             // 点击其他地方关闭菜单
             setTimeout(() => {
@@ -1019,8 +1071,8 @@
             
             let processed = output;
             
-            // 通用ANSI清理
-            processed = this.cleanAnsiOutput(processed);
+            // 使用更严格的ANSI清理
+            processed = this.strictCleanAnsiSequences(processed);
             
             // 根据系统类型进行特殊处理
             switch (system) {
@@ -1045,9 +1097,6 @@
         shouldFilterOutput(output) {
             if (!output || typeof output !== 'string') return false;
             
-            // 如果启用了调试模式，不过滤任何输出
-            if (this.debugMode) return false;
-            
             // 获取当前终端的系统类型
             const activeTerminal = this.terminals.get(this.activeTerminalId);
             const system = activeTerminal?.system || 'Unknown';
@@ -1071,11 +1120,15 @@
                     /^export TERM=/,
                     /^export LANG=/,
                     /^export LC_ALL=/,
-                    /^export PS1=/,
                     /^stty -echo/,
                     /^\r?\n$/,  // 空行
                     /^\[1m\[7m%\[27m\[1m\[0m$/,  // 常见的ANSI序列
                     /^\[K\[[?]?2004[hl]$/,  // 括号模式序列
+                    /^mm%mmm$/,  // 乱码提示符
+                    /^mmm\\u@\\h:\\w\$/,  // 乱码提示符
+                    /^2004[hl];/,  // 控制序列
+                    /^2004[hl]pwd/,  // 控制序列
+                    /^s20041$/,  // 乱码命令
                 ];
             } else {
                 // Linux过滤模式
@@ -1083,7 +1136,6 @@
                     /^export TERM=/,
                     /^export LANG=/,
                     /^export LC_ALL=/,
-                    /^export PS1=/,
                     /^stty -echo/,
                     /^\r?\n$/,  // 空行
                     /^\[1m\[7m%\[27m\[1m\[0m$/,  // 常见的ANSI序列
@@ -1094,34 +1146,7 @@
             return filterPatterns.some(pattern => pattern.test(output.trim()));
         }
 
-        // 调试模式状态
-        debugMode = false;
 
-        // 切换调试模式
-        toggleDebugMode() {
-            this.debugMode = !this.debugMode;
-            const button = document.getElementById('toggle-debug');
-            
-            if (this.debugMode) {
-                button.innerHTML = `
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    关闭调试
-                `;
-                button.className = 'px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center';
-                this.showNotification('调试模式已启用，将显示所有输出', 'info');
-            } else {
-                button.innerHTML = `
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    调试模式
-                `;
-                button.className = 'px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center';
-                this.showNotification('调试模式已关闭', 'info');
-            }
-        }
 
         // 处理Darwin系统的特殊输出
         handleDarwinOutput(output) {
@@ -1293,6 +1318,68 @@
                 }
                 return '';
             });
+            
+            // 移除多余的空白字符
+            cleaned = cleaned.replace(/\r\n\r\n/g, '\r\n');
+            cleaned = cleaned.replace(/\n\n/g, '\n');
+            
+            return cleaned;
+        }
+
+        // 增强的ANSI序列清理函数
+        cleanAnsiSequences(output) {
+            if (typeof output !== 'string') return output;
+            
+            let cleaned = output;
+            
+            // 移除所有ANSI转义序列，但保留基本的颜色和样式
+            cleaned = cleaned.replace(/\x1B\[[0-9;]*[ABCDEFGHJKSTfhlm]/g, (match) => {
+                // 保留基本的颜色和样式序列
+                if (match.match(/^\x1B\[[0-9;]*m$/)) {
+                    return match;
+                }
+                // 移除其他控制序列
+                return '';
+            });
+            
+            // 移除不完整的序列
+            cleaned = cleaned.replace(/\x1B\[[^a-zA-Z]*$/g, '');
+            cleaned = cleaned.replace(/\x1B\[[0-9;]*[^a-zA-Z]/g, '');
+            
+            // 移除Darwin特有的序列
+            cleaned = cleaned.replace(/\x1B\[[?]?200[0-9][hl]/g, '');
+            
+            // 移除shell提示符中的特殊字符
+            cleaned = cleaned.replace(/\\\[[^]]+\]/g, '');
+            cleaned = cleaned.replace(/%\{[^}]+\}/g, '');
+            
+            // 移除多余的空白字符
+            cleaned = cleaned.replace(/\r\n\r\n/g, '\r\n');
+            cleaned = cleaned.replace(/\n\n/g, '\n');
+            
+            return cleaned;
+        }
+
+        // 更严格的ANSI序列清理函数
+        strictCleanAnsiSequences(output) {
+            if (typeof output !== 'string') return output;
+            
+            let cleaned = output;
+            
+            // 移除所有ANSI转义序列
+            cleaned = cleaned.replace(/\x1B\[[0-9;]*[ABCDEFGHJKSTfhlm]/g, '');
+            cleaned = cleaned.replace(/\x1B\[[?]?200[0-9][hl]/g, '');
+            cleaned = cleaned.replace(/\x1B\[[0-9;]*[JK]/g, '');
+            cleaned = cleaned.replace(/\x1B\[[0-9;]*[Hf]/g, '');
+            
+            // 移除不完整的序列
+            cleaned = cleaned.replace(/\x1B\[[^a-zA-Z]*$/g, '');
+            cleaned = cleaned.replace(/\x1B\[[0-9;]*[^a-zA-Z]/g, '');
+            
+            // 移除shell提示符中的特殊字符
+            cleaned = cleaned.replace(/\\\[[^]]+\]/g, '');
+            cleaned = cleaned.replace(/%\{[^}]+\}/g, '');
+            cleaned = cleaned.replace(/\\u@\\h:\\w\\$/g, '\\u@\\h:\\w\\$');
             
             // 移除多余的空白字符
             cleaned = cleaned.replace(/\r\n\r\n/g, '\r\n');
@@ -1615,36 +1702,40 @@
 
         // 显示通知
         showNotification(message, type = 'info') {
-            const colors = {
-                info: 'blue',
-                success: 'green',
-                warning: 'yellow',
-                error: 'red'
-            };
+            if (window.showToast) {
+                window.showToast(message, type);
+            } else {
+                const colors = {
+                    info: 'blue',
+                    success: 'green',
+                    warning: 'yellow',
+                    error: 'red'
+                };
 
-            const notificationHtml = `
-                <div class="fixed top-4 right-4 bg-white border border-${colors[type]}-200 rounded-lg shadow-lg p-4 z-50 max-w-sm">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <svg class="h-6 w-6 text-${colors[type]}-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                        <div class="ml-3">
-                            <div class="text-sm font-medium text-gray-900">${message}</div>
+                const notificationHtml = `
+                    <div class="fixed top-4 right-4 bg-white border border-${colors[type]}-200 rounded-lg shadow-lg p-4 z-50 max-w-sm">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <svg class="h-6 w-6 text-${colors[type]}-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <div class="text-sm font-medium text-gray-900">${message}</div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
-            
-            document.body.insertAdjacentHTML('beforeend', notificationHtml);
-            
-            setTimeout(() => {
-                const notification = document.querySelector('.fixed.top-4.right-4');
-                if (notification) {
-                    notification.remove();
-                }
-            }, 3000);
+                `;
+                
+                document.body.insertAdjacentHTML('beforeend', notificationHtml);
+                
+                setTimeout(() => {
+                    const notification = document.querySelector('.fixed.top-4.right-4');
+                    if (notification) {
+                        notification.remove();
+                    }
+                }, 3000);
+            }
         }
 
         navigateHistory(terminalId, direction) {
@@ -1687,6 +1778,9 @@
                 const terminalInfo = this.terminals.get(this.activeTerminalId);
                 if (terminalInfo && terminalInfo.isConnected) {
                     try {
+                        // 清空终端显示
+                        terminalInfo.terminal.clear();
+                        
                         // 发送重置命令
                         if (terminalInfo.websocket && terminalInfo.websocket.readyState === WebSocket.OPEN) {
                             terminalInfo.websocket.send(JSON.stringify({
@@ -1722,6 +1816,22 @@
                     }
                 } else {
                     this.showNotification('终端未连接', 'error');
+                }
+            }
+        }
+
+        // 强制清理终端显示
+        forceCleanTerminal() {
+            if (this.activeTerminalId) {
+                const terminalInfo = this.terminals.get(this.activeTerminalId);
+                if (terminalInfo) {
+                    // 清空终端显示
+                    terminalInfo.terminal.clear();
+                    terminalInfo.terminal.write('\r\n');
+                    terminalInfo.terminal.write('\x1B[1;32m✅ 终端已清理\x1B[0m\r\n');
+                    terminalInfo.terminal.write('\r\n');
+                    
+                    this.showNotification('终端显示已强制清理', 'success');
                 }
             }
         }
@@ -2072,13 +2182,25 @@
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${statusColor}-100 text-${statusColor}-800">${statusText}</span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button class="text-blue-600 hover:text-blue-900 mr-2" onclick="terminalManager.viewFileTransfer('${record.filename}')">查看</button>
-                    <button class="text-red-600 hover:text-red-900" onclick="terminalManager.deleteFileTransfer(this)">删除</button>
+                    <button class="text-blue-600 hover:text-blue-900 mr-2" data-action="view" data-filename="${record.filename}">查看</button>
+                    <button class="text-red-600 hover:text-red-900" data-action="delete">删除</button>
                 </td>
             `;
 
             // 将新记录插入到表格顶部
             tbody.insertBefore(row, tbody.firstChild);
+
+            // 添加事件监听器
+            const viewButton = row.querySelector('[data-action="view"]');
+            const deleteButton = row.querySelector('[data-action="delete"]');
+            
+            viewButton.addEventListener('click', () => {
+                this.viewFileTransfer(viewButton.getAttribute('data-filename'));
+            });
+            
+            deleteButton.addEventListener('click', () => {
+                this.deleteFileTransfer(deleteButton);
+            });
 
             // 限制历史记录数量，最多显示10条
             const rows = tbody.querySelectorAll('tr');
@@ -2096,7 +2218,9 @@
         deleteFileTransfer(button) {
             if (confirm('确定要删除这条记录吗？')) {
                 const row = button.closest('tr');
-                row.remove();
+                if (row) {
+                    row.remove();
+                }
             }
         }
 
@@ -2106,32 +2230,36 @@
             const statusText = record.status === 'success' ? '成功' : '失败';
             const typeText = record.type === 'upload' ? '上传' : '下载';
             
-            const notificationHtml = `
-                <div class="fixed top-4 right-4 bg-white border border-${statusColor}-200 rounded-lg shadow-lg p-4 z-50 max-w-sm">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <svg class="h-6 w-6 text-${statusColor}-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                        <div class="ml-3">
-                            <div class="text-sm font-medium text-gray-900">文件${typeText}${statusText}</div>
-                            <div class="text-xs text-gray-500">${record.filename}</div>
-                            <div class="text-xs text-gray-400">${record.timestamp}</div>
+            if (window.showToast) {
+                window.showToast(`文件${typeText}${statusText}: ${record.filename}`, record.status === 'success' ? 'success' : 'error');
+            } else {
+                const notificationHtml = `
+                    <div class="fixed top-4 right-4 bg-white border border-${statusColor}-200 rounded-lg shadow-lg p-4 z-50 max-w-sm">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <svg class="h-6 w-6 text-${statusColor}-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <div class="text-sm font-medium text-gray-900">文件${typeText}${statusText}</div>
+                                <div class="text-xs text-gray-500">${record.filename}</div>
+                                <div class="text-xs text-gray-400">${record.timestamp}</div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
-            
-            document.body.insertAdjacentHTML('beforeend', notificationHtml);
-            
-            // 3秒后自动移除通知
-            setTimeout(() => {
-                const notification = document.querySelector('.fixed.top-4.right-4');
-                if (notification) {
-                    notification.remove();
-                }
-            }, 3000);
+                `;
+                
+                document.body.insertAdjacentHTML('beforeend', notificationHtml);
+                
+                // 3秒后自动移除通知
+                setTimeout(() => {
+                    const notification = document.querySelector('.fixed.top-4.right-4');
+                    if (notification) {
+                        notification.remove();
+                    }
+                }, 3000);
+            }
         }
 
 
@@ -2160,6 +2288,24 @@
 
             // 更新终端标签页状态
             this.updateTabStatus();
+            
+            // 如果没有终端，显示提示信息
+            if (this.terminals.size === 0) {
+                const container = document.getElementById('terminal-container');
+                if (container && !container.querySelector('.no-terminal-message')) {
+                    container.innerHTML = `
+                        <div class="no-terminal-message flex items-center justify-center h-full text-gray-500">
+                            <div class="text-center">
+                                <svg class="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                </svg>
+                                <p class="text-lg font-medium">暂无终端</p>
+                                <p class="text-sm">点击"新建终端"按钮开始使用</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
         }
 
         // 更新标签页状态
