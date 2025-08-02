@@ -1,0 +1,673 @@
+{% extends "base.html" %}
+
+{% block title %}Git 仓库管理 - Mini PM2{% endblock %}
+{% block page_title %}Git 仓库管理{% endblock %}
+
+{% block content %}
+<div class="page-content">
+    <!-- 扫描配置区域 -->
+    <div class="bg-white rounded-lg shadow-sm border p-6 mb-6">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">
+            <i class="fas fa-search mr-2"></i>扫描 Git 仓库
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    扫描路径
+                    <span class="tooltip-trigger ml-1 text-gray-400 cursor-help" title="输入要扫描的目录路径，系统会递归查找该目录下的所有 Git 仓库">
+                        <i class="fas fa-question-circle"></i>
+                    </span>
+                </label>
+                <input type="text" id="scan-path" placeholder="/path/to/repositories" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div class="flex items-end">
+                <button id="scan-btn" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors relative group">
+                    <i class="fas fa-search mr-2"></i>扫描仓库
+                    <div class="tooltip">扫描指定路径下的所有 Git 仓库，获取仓库状态信息</div>
+                </button>
+            </div>
+            <div class="flex items-end">
+                <button id="clear-cache-btn" class="w-full bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors relative group">
+                    <i class="fas fa-broom mr-2"></i>清除缓存
+                    <div class="tooltip">清除扫描结果缓存，下次扫描将重新获取最新状态</div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 仓库列表 -->
+    <div class="bg-white rounded-lg shadow-sm border">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <div class="flex justify-between items-center">
+                <h2 class="text-lg font-medium text-gray-900">
+                    <i class="fas fa-code-branch mr-2"></i>Git 仓库列表
+                </h2>
+                <div class="flex space-x-2">
+                    <button id="select-all-btn" class="text-sm text-blue-600 hover:text-blue-800">
+                        <i class="fas fa-check-square mr-1"></i>全选
+                    </button>
+                    <button id="deselect-all-btn" class="text-sm text-gray-600 hover:text-gray-800">
+                        <i class="fas fa-square mr-1"></i>取消全选
+                    </button>
+                    <button id="update-selected-btn" class="bg-green-600 text-white px-3 py-1 rounded-md text-sm hover:bg-green-700 transition-colors">
+                        <i class="fas fa-sync-alt mr-1"></i>更新选中
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="repositories-container" class="p-6">
+            <div id="loading" class="hidden text-center py-8">
+                <div class="loading-spinner inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+                <p class="mt-2 text-gray-600">正在扫描仓库...</p>
+            </div>
+            
+            <div id="no-repositories" class="hidden text-center py-8">
+                <i class="fas fa-folder-open text-4xl text-gray-400 mb-4"></i>
+                <p class="text-gray-600">未找到 Git 仓库</p>
+                <p class="text-sm text-gray-500 mt-2">请先配置扫描路径并点击扫描按钮</p>
+            </div>
+            
+            <div id="repositories-list" class="space-y-4">
+                <!-- 仓库列表将在这里动态生成 -->
+            </div>
+            
+            <!-- 分页控件 -->
+            <div id="pagination" class="hidden mt-6 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm text-gray-700">每页显示</span>
+                    <select id="page-size" class="text-sm border border-gray-300 rounded px-2 py-1">
+                        <option value="10">10</option>
+                        <option value="20" selected>20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                    <span class="text-sm text-gray-700">条</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button id="prev-page" class="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="fas fa-chevron-left mr-1"></i>上一页
+                    </button>
+                    <span id="page-info" class="text-sm text-gray-700">第 1 页，共 1 页</span>
+                    <button id="next-page" class="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                        下一页<i class="fas fa-chevron-right ml-1"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 更新结果模态框 -->
+    <div id="update-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-medium text-gray-900">
+                        <i class="fas fa-sync-alt mr-2"></i>更新结果
+                    </h3>
+                    <button id="close-modal" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="update-results" class="max-h-96 overflow-y-auto">
+                    <!-- 更新结果将在这里显示 -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .status-badge {
+        @apply px-2 py-1 rounded-full text-xs font-medium;
+    }
+    .status-up-to-date { @apply bg-green-100 text-green-800; }
+    .status-behind { @apply bg-yellow-100 text-yellow-800; }
+    .status-modified { @apply bg-red-100 text-red-800; }
+    .status-unknown { @apply bg-gray-100 text-gray-800; }
+    
+    .loading-spinner {
+        @apply animate-spin;
+    }
+    
+    .fade-in {
+        animation: fadeIn 0.3s ease-in;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .slide-in {
+        animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+        from { transform: translateX(-100%); }
+        to { transform: translateX(0); }
+    }
+    
+    /* Tooltip 样式 */
+    .tooltip {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #1f2937;
+        color: white;
+        padding: 0.5rem;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        white-space: nowrap;
+        z-index: 50;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.2s, visibility 0.2s;
+        margin-bottom: 0.5rem;
+    }
+    
+    .tooltip::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 0.25rem solid transparent;
+        border-top-color: #1f2937;
+    }
+    
+    .group:hover .tooltip {
+        opacity: 1;
+        visibility: visible;
+    }
+    
+    /* 状态徽章 tooltip */
+    .status-badge {
+        position: relative;
+        cursor: help;
+    }
+    
+    .status-badge::before {
+        content: attr(data-tooltip);
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #1f2937;
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.75rem;
+        white-space: nowrap;
+        z-index: 50;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.2s, visibility 0.2s;
+        margin-bottom: 0.25rem;
+    }
+    
+    .status-badge::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 0.125rem solid transparent;
+        border-top-color: #1f2937;
+    }
+    
+    .status-badge:hover::before {
+        opacity: 1;
+        visibility: visible;
+    }
+</style>
+
+<script>
+    class GitManager {
+        constructor() {
+            this.repositories = [];
+            this.selectedRepositories = new Set();
+            this.currentPage = 1;
+            this.pageSize = 20;
+            this.totalPages = 1;
+            this.totalRepositories = 0;
+            this.currentScanPath = '';
+            this.initializeEventListeners();
+        }
+
+        initializeEventListeners() {
+            // 扫描按钮
+            document.getElementById('scan-btn').addEventListener('click', () => {
+                this.scanRepositories();
+            });
+
+            // 清除缓存按钮
+            document.getElementById('clear-cache-btn').addEventListener('click', () => {
+                this.clearCache();
+            });
+
+            // 全选按钮
+            document.getElementById('select-all-btn').addEventListener('click', () => {
+                this.selectAll();
+            });
+
+            // 取消全选按钮
+            document.getElementById('deselect-all-btn').addEventListener('click', () => {
+                this.deselectAll();
+            });
+
+            // 更新选中按钮
+            document.getElementById('update-selected-btn').addEventListener('click', () => {
+                this.updateSelected();
+            });
+
+            // 关闭模态框
+            document.getElementById('close-modal').addEventListener('click', () => {
+                this.closeUpdateModal();
+            });
+
+            // 点击模态框背景关闭
+            document.getElementById('update-modal').addEventListener('click', (e) => {
+                if (e.target === e.currentTarget) {
+                    this.closeUpdateModal();
+                }
+            });
+
+            // 分页事件
+            document.getElementById('prev-page').addEventListener('click', () => {
+                if (this.currentPage > 1) {
+                    this.currentPage--;
+                    this.scanRepositories();
+                }
+            });
+
+            document.getElementById('next-page').addEventListener('click', () => {
+                if (this.currentPage < this.totalPages) {
+                    this.currentPage++;
+                    this.scanRepositories();
+                }
+            });
+
+            document.getElementById('page-size').addEventListener('change', (e) => {
+                this.pageSize = parseInt(e.target.value);
+                this.currentPage = 1;
+                this.scanRepositories();
+            });
+        }
+
+        async scanRepositories() {
+            const scanPath = document.getElementById('scan-path').value.trim();
+            if (!scanPath) {
+                this.showNotification('请输入扫描路径', 'error');
+                return;
+            }
+
+            this.currentScanPath = scanPath;
+            this.showLoading(true);
+            
+            try {
+                const response = await fetch('/api/git/scan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        base_path: scanPath,
+                        page: this.currentPage,
+                        limit: this.pageSize
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    this.repositories = data.repositories;
+                    this.totalRepositories = data.pagination.total;
+                    this.totalPages = data.pagination.total_pages;
+                    this.currentPage = data.pagination.page;
+                    
+                    this.renderRepositories();
+                    this.updatePagination();
+                    this.showNotification(`扫描完成，找到 ${this.totalRepositories} 个仓库`, 'success');
+                } else {
+                    this.showNotification('扫描失败', 'error');
+                }
+            } catch (error) {
+                console.error('扫描失败:', error);
+                this.showNotification('扫描失败: ' + error.message, 'error');
+            } finally {
+                this.showLoading(false);
+            }
+        }
+
+        async clearCache() {
+            try {
+                const response = await fetch('/api/git/clear-cache', {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    this.showNotification('缓存已清除', 'success');
+                } else {
+                    this.showNotification('清除缓存失败', 'error');
+                }
+            } catch (error) {
+                console.error('清除缓存失败:', error);
+                this.showNotification('清除缓存失败: ' + error.message, 'error');
+            }
+        }
+
+        renderRepositories() {
+            const container = document.getElementById('repositories-list');
+            const noRepositories = document.getElementById('no-repositories');
+            
+            if (this.repositories.length === 0) {
+                container.innerHTML = '';
+                noRepositories.classList.remove('hidden');
+                document.getElementById('pagination').classList.add('hidden');
+                return;
+            }
+
+            noRepositories.classList.add('hidden');
+            document.getElementById('pagination').classList.remove('hidden');
+            
+            container.innerHTML = this.repositories.map((repo, index) => `
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <input type="checkbox" 
+                                   class="repo-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                   data-path="${repo.path}"
+                                   ${this.selectedRepositories.has(repo.path) ? 'checked' : ''}>
+                            <div>
+                                <h3 class="text-lg font-medium text-gray-900">${repo.name}</h3>
+                                <p class="text-sm text-gray-500">${repo.path}</p>
+                                ${repo.remote_url ? `<p class="text-xs text-gray-400">${repo.remote_url}</p>` : ''}
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="status-badge status-${repo.status}" data-tooltip="${this.getStatusTooltip(repo.status)}">
+                                ${this.getStatusText(repo.status)}
+                            </span>
+                            <div class="text-right">
+                                <p class="text-sm text-gray-600">分支: ${repo.current_branch || 'unknown'}</p>
+                                ${repo.last_update ? `<p class="text-xs text-gray-500">${this.formatDate(repo.last_update)}</p>` : ''}
+                            </div>
+                            <button class="update-single-btn text-blue-600 hover:text-blue-800 relative group" data-path="${repo.path}">
+                                <i class="fas fa-sync-alt"></i>
+                                <div class="tooltip">单独更新此仓库</div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            // 绑定复选框事件
+            container.querySelectorAll('.repo-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', (e) => {
+                    const path = e.target.dataset.path;
+                    if (e.target.checked) {
+                        this.selectedRepositories.add(path);
+                    } else {
+                        this.selectedRepositories.delete(path);
+                    }
+                });
+            });
+
+            // 绑定单个更新按钮事件
+            container.querySelectorAll('.update-single-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const path = e.target.closest('button').dataset.path;
+                    this.updateSingleRepository(path);
+                });
+            });
+        }
+
+        selectAll() {
+            this.selectedRepositories.clear();
+            document.querySelectorAll('.repo-checkbox').forEach(checkbox => {
+                checkbox.checked = true;
+                this.selectedRepositories.add(checkbox.dataset.path);
+            });
+        }
+
+        deselectAll() {
+            this.selectedRepositories.clear();
+            document.querySelectorAll('.repo-checkbox').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+        }
+
+        async updateSelected() {
+            if (this.selectedRepositories.size === 0) {
+                this.showNotification('请先选择要更新的仓库', 'warning');
+                return;
+            }
+
+            const repositories = Array.from(this.selectedRepositories);
+            await this.updateRepositories(repositories);
+        }
+
+        async updateSingleRepository(path) {
+            await this.updateRepositories([path]);
+        }
+
+        async updateRepositories(repositories) {
+            try {
+                const response = await fetch('/api/git/update', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        repositories: repositories,
+                        force: false
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    this.showUpdateResults(data);
+                    this.showNotification(`更新完成: ${data.summary.success} 成功, ${data.summary.failed} 失败`, 'success');
+                } else {
+                    this.showNotification('更新失败', 'error');
+                }
+            } catch (error) {
+                console.error('更新失败:', error);
+                this.showNotification('更新失败: ' + error.message, 'error');
+            }
+        }
+
+        showUpdateResults(data) {
+            const resultsContainer = document.getElementById('update-results');
+            const summary = data.summary;
+            
+            let html = `
+                <div class="mb-4 p-4 bg-gray-50 rounded-lg">
+                    <h4 class="font-medium text-gray-900 mb-2">更新摘要</h4>
+                    <div class="grid grid-cols-4 gap-4 text-sm">
+                        <div class="text-center">
+                            <div class="text-lg font-bold text-blue-600">${summary.total}</div>
+                            <div class="text-gray-600">总计</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-lg font-bold text-green-600">${summary.success}</div>
+                            <div class="text-gray-600">成功</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-lg font-bold text-red-600">${summary.failed}</div>
+                            <div class="text-gray-600">失败</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-lg font-bold text-yellow-600">${summary.skipped}</div>
+                            <div class="text-gray-600">跳过</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 成功的结果
+            if (data.results.success.length > 0) {
+                html += `
+                    <div class="mb-4">
+                        <h4 class="font-medium text-green-700 mb-2">
+                            <i class="fas fa-check-circle mr-1"></i>成功更新 (${data.results.success.length})
+                        </h4>
+                        <div class="space-y-2">
+                            ${data.results.success.map(result => `
+                                <div class="p-3 bg-green-50 border border-green-200 rounded-lg">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <div class="font-medium text-green-800">${result.path}</div>
+                                            <div class="text-sm text-green-600">
+                                                分支: ${result.before_branch} → ${result.after_branch}
+                                            </div>
+                                            ${result.updated ? '<div class="text-xs text-green-500">✓ 有更新</div>' : '<div class="text-xs text-gray-500">已是最新</div>'}
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 失败的结果
+            if (data.results.failed.length > 0) {
+                html += `
+                    <div class="mb-4">
+                        <h4 class="font-medium text-red-700 mb-2">
+                            <i class="fas fa-times-circle mr-1"></i>更新失败 (${data.results.failed.length})
+                        </h4>
+                        <div class="space-y-2">
+                            ${data.results.failed.map(result => `
+                                <div class="p-3 bg-red-50 border border-red-200 rounded-lg">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <div class="font-medium text-red-800">${result.path}</div>
+                                            <div class="text-sm text-red-600">${result.error}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            resultsContainer.innerHTML = html;
+            document.getElementById('update-modal').classList.remove('hidden');
+        }
+
+        closeUpdateModal() {
+            document.getElementById('update-modal').classList.add('hidden');
+        }
+
+        showLoading(show) {
+            const loading = document.getElementById('loading');
+            const repositoriesList = document.getElementById('repositories-list');
+            
+            if (show) {
+                loading.classList.remove('hidden');
+                repositoriesList.classList.add('hidden');
+            } else {
+                loading.classList.add('hidden');
+                repositoriesList.classList.remove('hidden');
+            }
+        }
+
+        updatePagination() {
+            const prevBtn = document.getElementById('prev-page');
+            const nextBtn = document.getElementById('next-page');
+            const pageInfo = document.getElementById('page-info');
+            const pageSize = document.getElementById('page-size');
+            
+            // 更新按钮状态
+            prevBtn.disabled = this.currentPage <= 1;
+            nextBtn.disabled = this.currentPage >= this.totalPages;
+            
+            // 更新页码信息
+            pageInfo.textContent = `第 ${this.currentPage} 页，共 ${this.totalPages} 页 (共 ${this.totalRepositories} 个仓库)`;
+            
+            // 更新页面大小选择器
+            pageSize.value = this.pageSize;
+        }
+
+        getStatusText(status) {
+            const statusMap = {
+                'up_to_date': '最新',
+                'behind': '落后',
+                'modified': '已修改',
+                'unknown': '未知'
+            };
+            return statusMap[status] || status;
+        }
+
+        getStatusTooltip(status) {
+            const tooltipMap = {
+                'up_to_date': '仓库已是最新状态，无需更新',
+                'behind': '远程仓库有新的提交，需要拉取更新',
+                'modified': '本地有未提交的修改，更新前请先提交或暂存',
+                'unknown': '无法确定仓库状态，请手动检查'
+            };
+            return tooltipMap[status] || '未知状态';
+        }
+
+        formatDate(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return date.toLocaleString('zh-CN');
+        }
+
+        showNotification(message, type = 'info') {
+            // 使用全局的 showToast 函数
+            if (window.showToast) {
+                window.showToast(message, type);
+            } else {
+                // 创建通知元素
+                const notification = document.createElement('div');
+                notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm fade-in`;
+                
+                const colors = {
+                    success: 'bg-green-500 text-white',
+                    error: 'bg-red-500 text-white',
+                    warning: 'bg-yellow-500 text-white',
+                    info: 'bg-blue-500 text-white'
+                };
+                
+                notification.className += ` ${colors[type] || colors.info}`;
+                notification.innerHTML = `
+                    <div class="flex items-center">
+                        <span class="mr-2">
+                            ${type === 'success' ? '<i class="fas fa-check-circle"></i>' : 
+                              type === 'error' ? '<i class="fas fa-times-circle"></i>' :
+                              type === 'warning' ? '<i class="fas fa-exclamation-triangle"></i>' :
+                              '<i class="fas fa-info-circle"></i>'}
+                        </span>
+                        <span>${message}</span>
+                    </div>
+                `;
+                
+                document.body.appendChild(notification);
+                
+                // 3秒后自动移除
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 3000);
+            }
+        }
+    }
+
+    // 初始化应用
+    document.addEventListener('DOMContentLoaded', () => {
+        window.gitManager = new GitManager();
+    });
+</script>
+{% endblock %} 

@@ -30,6 +30,7 @@ from task_store.sqlite_store import SQLiteTaskStore
 from services.task_service import TaskService
 from services.monitoring_service import MonitoringService
 from services.export_service import ExportService
+from services.git_service import GitService
 from config_manager import update_config, get_all_config
 
 # 配置
@@ -56,6 +57,7 @@ task_store: Optional[TaskStore] = None
 task_service: Optional[TaskService] = None
 monitoring_service: Optional[MonitoringService] = None
 export_service: Optional[ExportService] = None
+git_service: Optional[GitService] = None
 redis_client: Optional[redis.Redis] = None
 log_buffer: List[str] = []
 task_status: Dict[str, Dict[str, Any]] = {}
@@ -141,7 +143,7 @@ class SystemStatus(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用启动和关闭时的处理"""
-    global task_store, task_service, redis_client, export_service
+    global task_store, task_service, redis_client, export_service, git_service
     
     # 启动时初始化
     print("🚀 启动 Mini PM2 FastAPI 应用...")
@@ -195,6 +197,9 @@ async def lifespan(app: FastAPI):
         export_path=CONFIG["export_path"],
         max_size=CONFIG["max_export_size"]
     )
+    
+    # 初始化 Git 服务
+    git_service = GitService()
     
     # 初始化日志管理器
     from services.log_manager import get_log_manager
@@ -257,6 +262,11 @@ async def terminal_page(request: Request):
 async def terminal_enhanced_page(request: Request):
     """增强终端管理页面"""
     return templates.TemplateResponse("terminal_enhanced.html", {"request": request})
+
+@app.get("/git", response_class=HTMLResponse)
+async def git_page(request: Request):
+    """Git 仓库管理页面"""
+    return templates.TemplateResponse("git.html", {"request": request})
 
 # ==================== API 路由 ====================
 
@@ -2365,6 +2375,119 @@ async def upload_file(file: UploadFile, remote_path: str = Form(...)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"文件上传失败: {str(e)}")
+
+# Git仓库管理相关模型
+class GitRepository(BaseModel):
+    path: str = Field(..., description="Git仓库路径")
+    name: str = Field(..., description="仓库名称")
+    remote_url: Optional[str] = Field(None, description="远程仓库URL")
+    current_branch: Optional[str] = Field(None, description="当前分支")
+    status: str = Field("unknown", description="仓库状态")
+    last_update: Optional[str] = Field(None, description="最后更新时间")
+
+class GitUpdateRequest(BaseModel):
+    repositories: List[str] = Field(..., description="要更新的仓库路径列表")
+    force: bool = Field(False, description="是否强制更新")
+
+class GitScanRequest(BaseModel):
+    base_path: str = Field(..., description="扫描的基础路径")
+    page: int = Field(1, ge=1, description="页码")
+    limit: int = Field(20, ge=1, le=100, description="每页数量")
+
+# ==================== Git 仓库管理 API ====================
+
+@app.post("/api/git/scan")
+async def scan_git_repositories(request: GitScanRequest) -> Dict[str, Any]:
+    """扫描指定路径下的 git 仓库"""
+    try:
+        if not git_service:
+            raise HTTPException(status_code=500, detail="Git 服务未初始化")
+        
+        result = await git_service.scan_git_repositories(
+            request.base_path, 
+            request.page, 
+            request.limit
+        )
+        
+        return {
+            "success": True,
+            "repositories": result["repositories"],
+            "pagination": {
+                "total": result["total"],
+                "page": result["page"],
+                "limit": result["limit"],
+                "total_pages": result["total_pages"],
+                "has_next": result["has_next"],
+                "has_prev": result["has_prev"]
+            },
+            "scan_time": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"扫描失败: {str(e)}")
+
+@app.post("/api/git/update")
+async def update_git_repositories(request: GitUpdateRequest) -> Dict[str, Any]:
+    """更新指定的 git 仓库"""
+    try:
+        if not git_service:
+            raise HTTPException(status_code=500, detail="Git 服务未初始化")
+        
+        results = await git_service.update_repositories(request.repositories, request.force)
+        
+        return {
+            "success": True,
+            "results": results,
+            "summary": {
+                "total": len(request.repositories),
+                "success": len(results["success"]),
+                "failed": len(results["failed"]),
+                "skipped": len(results["skipped"])
+            },
+            "update_time": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"更新失败: {str(e)}")
+
+@app.get("/api/git/repository/{repo_path:path}")
+async def get_repository_details(repo_path: str) -> Dict[str, Any]:
+    """获取仓库详细信息"""
+    try:
+        if not git_service:
+            raise HTTPException(status_code=500, detail="Git 服务未初始化")
+        
+        # URL 解码路径
+        import urllib.parse
+        decoded_path = urllib.parse.unquote(repo_path)
+        
+        details = await git_service.get_repository_details(decoded_path)
+        
+        if not details:
+            raise HTTPException(status_code=404, detail="仓库不存在或无法访问")
+        
+        return {
+            "success": True,
+            "repository": details
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取仓库信息失败: {str(e)}")
+
+@app.post("/api/git/clear-cache")
+async def clear_git_cache() -> JSONResponse:
+    """清除 git 服务缓存"""
+    try:
+        if not git_service:
+            raise HTTPException(status_code=500, detail="Git 服务未初始化")
+        
+        git_service.clear_cache()
+        
+        return JSONResponse(
+            status_code=200,
+            content={"success": True, "message": "缓存已清除"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"清除缓存失败: {str(e)}")
 
 @app.get("/api/download")
 async def download_file(filepath: str):
