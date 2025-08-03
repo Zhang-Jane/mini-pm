@@ -203,6 +203,10 @@ class TaskService:
                     error_detail += f"\n\n输出内容:\n" + "\n".join(output_lines[-20:])  # 保留最后20行输出
                 
                 get_log_manager().log_task_failure(task_id, script_path, error_msg, return_code)
+                
+                # 发送钉钉告警
+                await self._send_dingtalk_alert("任务执行失败", f"任务 {task_id} 执行失败\n脚本: {script_path}\n退出码: {return_code}\n执行时间: {duration:.2f}秒")
+                
                 async with self.task_lock:
                     current_status = self.task_status.get(task_id, {})
                     run_count = current_status.get("run_count", 0) + 1
@@ -224,6 +228,10 @@ class TaskService:
             duration = (end_time - start_time).total_seconds()
             error_detail = f"任务执行异常 - 脚本: {script_path}, 异常: {str(e)}"
             get_log_manager().log_task_exception(task_id, script_path, e)
+            
+            # 发送钉钉告警
+            await self._send_dingtalk_alert("任务执行异常", f"任务 {task_id} 执行异常\n脚本: {script_path}\n异常信息: {str(e)}\n执行时间: {duration:.2f}秒")
+            
             async with self.task_lock:
                 current_status = self.task_status.get(task_id, {})
                 run_count = current_status.get("run_count", 0) + 1
@@ -245,6 +253,28 @@ class TaskService:
                 del self.running_tasks[task_id]
             
             await self._broadcast_status()
+    
+    async def _send_dingtalk_alert(self, alert_type: str, details: str):
+        """发送钉钉告警"""
+        try:
+            # 检查是否启用了任务异常告警
+            from main import CONFIG
+            if CONFIG.get("dingtalk_task_alert_enable", False) and CONFIG.get("dingtalk_task_alert_token"):
+                from services.dingtalk_alert import DingTalkAlert
+                task_alert = DingTalkAlert(
+                    ding_access_token=CONFIG["dingtalk_task_alert_token"],
+                    ding_url=CONFIG.get("dingtalk_task_alert_url", "https://oapi.dingtalk.com/robot/send?access_token="),
+                    secret=CONFIG.get("dingtalk_task_alert_secret", "")
+                )
+                result = task_alert.send_system_alert(alert_type, details)
+                if result.get("errcode") == 0:
+                    get_log_manager().log(f"任务异常钉钉告警发送成功: {alert_type}", "INFO")
+                else:
+                    get_log_manager().log(f"任务异常钉钉告警发送失败: {result.get('errmsg', '未知错误')}", "ERROR")
+            else:
+                get_log_manager().log("任务异常告警未启用或配置不完整", "INFO")
+        except Exception as e:
+            get_log_manager().log(f"发送任务异常钉钉告警失败: {e}", "ERROR")
     
     async def run_task_now(self, task_id: str):
         """立即运行任务"""

@@ -395,7 +395,7 @@
         const response = await fetch('/api/settings/storage-info');
         if (response.ok) {
           const storageInfo = await response.json();
-          const currentStorageType = storageInfo.storage_config.type;
+          const currentStorageType = storageInfo.storage_type;
           
           // 如果存储类型发生变化，重新加载任务
           const lastStorageType = localStorage.getItem('last-storage-type');
@@ -630,7 +630,8 @@
         <td class="px-4 py-3 text-sm text-gray-900 font-medium">${task.id}</td>
         <td class="px-4 py-3 text-sm text-gray-500 hidden xl:table-cell">
             <span class="cursor-pointer hover:text-blue-600 hover:underline" 
-                  onclick="showFullPath('${task.script_path.replace(/'/g, "\\'").replace(/"/g, '\\"')}')" 
+                  onclick="showFullPath(this)" 
+                  data-path="${task.script_path}"
                   title="点击查看完整路径">
                 ${task.script_path.split('/').pop() || task.script_path}
             </span>
@@ -678,7 +679,10 @@
                   </button>` : ''
                 }
                 ${(task.status === 'FAILED' || task.status === 'EXCEPTION') && task.error_detail ? 
-                  `<button onclick="showErrorDetail('${task.id}', '${task.error_detail.replace(/'/g, "\\'").replace(/"/g, '\\"')}', '${task.error_timestamp || ''}')" 
+                  `<button                   onclick="showErrorDetail(this)" 
+                    data-task-id="${task.id}"
+                    data-error-detail="${task.error_detail || ''}"
+                    data-error-timestamp="${task.error_timestamp || ''}"
                     class="px-3 py-1.5 text-xs font-medium bg-orange-50 text-orange-700 border border-orange-200 rounded-md hover:bg-orange-100 transition-colors">
                     详情
                   </button>` : ''
@@ -982,6 +986,13 @@
 
   // 显示错误详情弹窗
   function showErrorDetail(taskId, errorDetail, errorTimestamp) {
+    // 如果传入的是元素，从data属性获取信息
+    if (typeof taskId === 'object' && taskId.dataset) {
+      const element = taskId;
+      taskId = element.dataset.taskId;
+      errorDetail = element.dataset.errorDetail;
+      errorTimestamp = element.dataset.errorTimestamp;
+    }
     document.getElementById('error-task-id').textContent = taskId;
     document.getElementById('error-timestamp').textContent = errorTimestamp || '未知时间';
     document.getElementById('error-detail-content').textContent = errorDetail;
@@ -1299,6 +1310,10 @@
 
   // 显示完整路径
   function showFullPath(fullPath) {
+    // 如果传入的是元素，从data-path获取路径
+    if (typeof fullPath === 'object' && fullPath.dataset) {
+      fullPath = fullPath.dataset.path;
+    }
     // 创建一个模态框来显示完整路径
     const modal = document.createElement('div');
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';

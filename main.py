@@ -31,10 +31,13 @@ from services.task_service import TaskService
 from services.monitoring_service import MonitoringService
 from services.export_service import ExportService
 from services.git_service import GitService
-from config_manager import update_config, get_all_config
+from config_store import init_config_store, get_config, set_config, update_config, get_all_config
 
-# 配置
-CONFIG = {
+# 配置存储类型
+CONFIG_STORAGE_TYPE = os.getenv("CONFIG_STORAGE_TYPE", "json")  # json、sqlite 或 redis
+
+# 默认配置（用于初始化）
+DEFAULT_CONFIG = {
     "storage_type": os.getenv("STORAGE_TYPE", "json"),  # json、redis 或 sqlite
     "redis_url": os.getenv("REDIS_URL", "redis://localhost:6379"),
     "redis_db": int(os.getenv("REDIS_DB", "0")),
@@ -49,8 +52,21 @@ CONFIG = {
     "export_path": os.getenv("EXPORT_PATH", "./exports"),
     "max_export_size": int(os.getenv("MAX_EXPORT_SIZE", "10485760")),  # 10MB
     "host": os.getenv("HOST", "0.0.0.0"),
-    "port": int(os.getenv("PORT", "8100"))
+    "port": int(os.getenv("PORT", "8100")),
+    # 钉钉告警配置
+    "enable_dingtalk_alert": os.getenv("ENABLE_DINGTALK_ALERT", "false").lower() == "true",
+    "dingtalk_access_token": os.getenv("DINGTALK_ACCESS_TOKEN", ""),
+    "dingtalk_url": os.getenv("DINGTALK_URL", "https://oapi.dingtalk.com/robot/send?access_token="),
+    # 系统监控配置
+    "enable_system_monitor": os.getenv("ENABLE_SYSTEM_MONITOR", "false").lower() == "true",
+    "cpu_threshold": float(os.getenv("CPU_THRESHOLD", "89.0")),
+    "memory_threshold": float(os.getenv("MEMORY_THRESHOLD", "90.0")),
+    "disk_threshold": float(os.getenv("DISK_THRESHOLD", "90.0")),
+    "monitor_check_interval": int(os.getenv("MONITOR_CHECK_INTERVAL", "60"))
 }
+
+# 全局配置变量
+CONFIG = DEFAULT_CONFIG.copy()
 
 # 全局变量
 task_store: Optional[TaskStore] = None
@@ -62,6 +78,8 @@ redis_client: Optional[redis.Redis] = None
 log_buffer: List[str] = []
 task_status: Dict[str, Dict[str, Any]] = {}
 websocket_connections: List[WebSocket] = []
+dingtalk_alert: Optional['DingTalkAlert'] = None
+system_monitor: Optional['SystemMonitor'] = None
 
 # 广播日志函数 - 异步优化版本
 async def _broadcast_log(message: str):
@@ -143,13 +161,40 @@ class SystemStatus(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用启动和关闭时的处理"""
-    global task_store, task_service, redis_client, export_service, git_service
+    global task_store, task_service, redis_client, export_service, git_service, CONFIG
     
     # 启动时初始化
     print("🚀 启动 Mini PM2 FastAPI 应用...")
     
     # 记录应用启动时间
     app.state.start_time = datetime.now()
+    
+    # 初始化配置存储系统
+    print(f"📊 初始化配置存储: {CONFIG_STORAGE_TYPE}")
+    
+    # 根据配置存储类型初始化
+    if CONFIG_STORAGE_TYPE == "redis":
+        redis_url = os.getenv("CONFIG_REDIS_URL", "redis://localhost:6379")
+        redis_db = int(os.getenv("CONFIG_REDIS_DB", "1"))
+        await init_config_store("redis", redis_url=redis_url, db=redis_db)
+    elif CONFIG_STORAGE_TYPE == "sqlite":
+        db_file = os.getenv("CONFIG_DB_FILE", "config.db")
+        await init_config_store("sqlite", db_file=db_file)
+    else:
+        config_file = os.getenv("CONFIG_FILE", "config.json")
+        await init_config_store("json", config_file=config_file)
+    
+    # 从配置存储加载配置
+    stored_config = await get_all_config()
+    if stored_config:
+        # 合并存储的配置和默认配置
+        CONFIG.update(stored_config)
+        print("✅ 从配置存储加载配置成功")
+    else:
+        # 如果没有存储的配置，使用默认配置并保存
+        await update_config(DEFAULT_CONFIG)
+        CONFIG.update(DEFAULT_CONFIG)
+        print("✅ 使用默认配置并保存到存储")
     
     # 初始化存储
     if CONFIG["storage_type"] == "redis":
@@ -201,9 +246,60 @@ async def lifespan(app: FastAPI):
     # 初始化 Git 服务
     git_service = GitService()
     
+    # 初始化钉钉告警
+    global dingtalk_alert
+    if CONFIG["enable_dingtalk_alert"] and CONFIG["dingtalk_access_token"]:
+        try:
+            from services.dingtalk_alert import DingTalkAlert
+            dingtalk_alert = DingTalkAlert(
+                access_token=CONFIG["dingtalk_access_token"],
+                ding_url=CONFIG["dingtalk_url"]
+            )
+            print("✅ 钉钉告警初始化成功")
+        except Exception as e:
+            print(f"❌ 钉钉告警初始化失败: {e}")
+            dingtalk_alert = None
+    else:
+        dingtalk_alert = None
+        print("ℹ️ 钉钉告警未启用")
+    
+    # 初始化系统监控
+    global system_monitor
+    if CONFIG["enable_system_monitor"]:
+        try:
+            from services.system_monitor import SystemMonitor
+            system_monitor = SystemMonitor(dingtalk_alert)
+            
+            # 设置监控阈值
+            system_monitor.update_thresholds({
+                "cpu_usage": CONFIG["cpu_threshold"],
+                "memory_usage": CONFIG["memory_threshold"],
+                "disk_usage": CONFIG["disk_threshold"],
+                "check_interval": CONFIG["monitor_check_interval"]
+            })
+            
+            await system_monitor.start()
+            print("✅ 系统监控初始化成功")
+        except Exception as e:
+            print(f"❌ 系统监控初始化失败: {e}")
+            system_monitor = None
+    else:
+        system_monitor = None
+        print("ℹ️ 系统监控未启用")
+    
     # 初始化日志管理器
     from services.log_manager import get_log_manager
     get_log_manager(broadcast_callback=_broadcast_log, log_buffer=log_buffer)
+    
+    # 发送应用启动通知
+    if dingtalk_alert:
+        try:
+            dingtalk_alert.send_system_alert(
+                "系统启动",
+                f"Mini PM2 系统已启动\n启动时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n存储类型: {CONFIG['storage_type']}\n监控状态: {'启用' if CONFIG['enable_monitoring'] else '禁用'}"
+            )
+        except Exception as e:
+            print(f"发送启动通知失败: {e}")
     
     print("✅ 应用初始化完成")
     
@@ -211,10 +307,23 @@ async def lifespan(app: FastAPI):
     
     # 关闭时清理
     print("🛑 关闭应用...")
+    
+    # 发送应用关闭通知
+    if dingtalk_alert:
+        try:
+            dingtalk_alert.send_system_alert(
+                "系统关闭",
+                f"Mini PM2 系统正在关闭\n关闭时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+        except Exception as e:
+            print(f"发送关闭通知失败: {e}")
+    
     if task_service:
         await task_service.stop()
     if monitoring_service:
         await monitoring_service.stop()
+    if system_monitor:
+        await system_monitor.stop()
     if redis_client:
         await redis_client.close()
     print("✅ 应用已关闭")
@@ -1856,41 +1965,66 @@ async def get_system_info() -> Dict[str, Any]:
 async def get_system_config() -> Dict[str, Any]:
     """获取系统配置"""
     try:
+        # 从配置存储获取所有配置
+        all_config = await get_all_config()
+        
         # 构建存储配置
         storage_config = {
-            "type": CONFIG["storage_type"],
+            "type": all_config.get("storage_type", "json"),
             "config": {}
         }
         
-        if CONFIG["storage_type"] == "redis":
+        storage_type = all_config.get("storage_type", "json")
+        if storage_type == "redis":
             storage_config["config"] = {
-                "redis_url": CONFIG["redis_url"],
-                "redis_db": CONFIG["redis_db"]
+                "redis_url": all_config.get("redis_url", "redis://localhost:6379"),
+                "redis_db": all_config.get("redis_db", 0)
             }
-        elif CONFIG["storage_type"] == "sqlite":
+        elif storage_type == "sqlite":
             storage_config["config"] = {
-                "sqlite_db": CONFIG["sqlite_db"]
+                "sqlite_db": all_config.get("sqlite_db", "tasks.db")
             }
         else:
             storage_config["config"] = {
-                "json_file": CONFIG["json_file"],
-                "jobs_directory": CONFIG.get("jobs_directory"),
-                "task_file_prefix": CONFIG.get("task_file_prefix", "task")
+                "json_file": all_config.get("json_file", "tasks.json"),
+                "jobs_directory": all_config.get("jobs_directory"),
+                "task_file_prefix": all_config.get("task_file_prefix", "task")
             }
         
         config = {
             "storage": storage_config,
             "logging": {
-                "max_lines": CONFIG["log_limit"],
+                "max_lines": all_config.get("log_limit", 500),
                 "log_level": "INFO"
             },
             "monitoring": {
-                "refresh_interval": CONFIG["monitoring_interval"],
-                "enabled": CONFIG["enable_monitoring"]
+                "refresh_interval": all_config.get("monitoring_interval", 60),
+                "enabled": all_config.get("enable_monitoring", True)
             },
             "tasks": {
                 "max_concurrent": 5,
                 "default_interval": 10
+            },
+            "system": {
+                "host": all_config.get("host", "0.0.0.0"),
+                "port": all_config.get("port", 8100),
+                "check_interval": all_config.get("check_interval", 30)
+            },
+            "export": {
+                "export_path": all_config.get("export_path", "./exports"),
+                "max_export_size": all_config.get("max_export_size", 10485760)
+            },
+            "dingtalk": {
+                "enable_dingtalk_alert": all_config.get("enable_dingtalk_alert", False),
+                "dingtalk_access_token": all_config.get("dingtalk_access_token", ""),
+                "dingtalk_url": all_config.get("dingtalk_url", "https://oapi.dingtalk.com/robot/send?access_token=")
+            },
+            "system_monitor": {
+                "enable_system_monitor": all_config.get("enable_system_monitor", False),
+                "cpu_threshold": all_config.get("cpu_threshold", 89.0),
+                "memory_threshold": all_config.get("memory_threshold", 90.0),
+                "disk_threshold": all_config.get("disk_threshold", 90.0),
+                "monitor_check_interval": all_config.get("monitor_check_interval", 60)
             }
         }
         return config
@@ -1901,20 +2035,30 @@ async def get_system_config() -> Dict[str, Any]:
 async def update_system_config(config: Dict[str, Any]) -> JSONResponse:
     """更新系统配置"""
     try:
-        # 更新全局配置
+        # 准备要更新的配置
         config_to_update = {}
-        for key, value in config.items():
-            if key in CONFIG:
-                CONFIG[key] = value
-                config_to_update[key] = value
-                print(f"更新配置: {key} = {value}")
         
-        # 批量更新到配置文件
+        # 处理嵌套配置
+        for section, section_config in config.items():
+            if isinstance(section_config, dict):
+                for key, value in section_config.items():
+                    config_key = f"{section}_{key}" if section != "storage" else key
+                    config_to_update[config_key] = value
+            else:
+                config_to_update[section] = section_config
+        
+        # 更新到配置存储
         if config_to_update:
-            update_config(config_to_update)
+            await update_config(config_to_update)
+            
+            # 更新全局配置
+            global CONFIG
+            CONFIG.update(config_to_update)
+            
+            print(f"✅ 配置已更新: {list(config_to_update.keys())}")
         
         # 如果存储类型发生变化，需要重新初始化存储
-        if "storage_type" in config:
+        if "storage_type" in config_to_update:
             await reinitialize_storage()
         
         return JSONResponse({"message": "系统配置已更新"})
@@ -2535,6 +2679,39 @@ class GitScanRequest(BaseModel):
     page: int = Field(1, ge=1, description="页码")
     limit: int = Field(20, ge=1, le=100, description="每页数量")
 
+class DingTalkAlertConfig(BaseModel):
+    """钉钉告警配置"""
+    enable: bool = Field(False, description="是否启用")
+    access_token: str = Field("", description="钉钉机器人访问令牌")
+    secret: str = Field("", description="钉钉机器人密钥（可选）")
+    url: str = Field("https://oapi.dingtalk.com/robot/send?access_token=", description="钉钉机器人URL")
+    name: str = Field("", description="告警配置名称")
+
+class DingTalkConfig(BaseModel):
+    """钉钉告警总配置"""
+    # 程序异常中断退出通知告警
+    system_alert: DingTalkAlertConfig = Field(
+        default_factory=lambda: DingTalkAlertConfig(name="系统异常告警"),
+        description="系统异常告警配置"
+    )
+    # 系统负载监控告警
+    monitor_alert: DingTalkAlertConfig = Field(
+        default_factory=lambda: DingTalkAlertConfig(name="系统监控告警"),
+        description="系统监控告警配置"
+    )
+    # 任务执行异常告警
+    task_alert: DingTalkAlertConfig = Field(
+        default_factory=lambda: DingTalkAlertConfig(name="任务异常告警"),
+        description="任务异常告警配置"
+    )
+
+class SystemMonitorConfig(BaseModel):
+    enable_system_monitor: bool = Field(False, description="是否启用系统监控")
+    cpu_threshold: float = Field(89.0, ge=0, le=100, description="CPU使用率阈值")
+    memory_threshold: float = Field(90.0, ge=0, le=100, description="内存使用率阈值")
+    disk_threshold: float = Field(90.0, ge=0, le=100, description="磁盘使用率阈值")
+    monitor_check_interval: int = Field(60, ge=10, le=3600, description="监控检查间隔（秒）")
+
 # ==================== Git 仓库管理 API ====================
 
 @app.post("/api/git/scan")
@@ -2629,6 +2806,509 @@ async def clear_git_cache() -> JSONResponse:
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"清除缓存失败: {str(e)}")
+
+# ==================== 钉钉告警 API ====================
+
+@app.get("/api/settings/dingtalk-config")
+async def get_dingtalk_config() -> DingTalkConfig:
+    """获取钉钉告警配置"""
+    # 从CONFIG中读取配置，如果不存在则使用默认值
+    return DingTalkConfig(
+        system_alert=DingTalkAlertConfig(
+            enable=CONFIG.get("dingtalk_system_alert_enable", False),
+            access_token=CONFIG.get("dingtalk_system_alert_token", ""),
+            secret=CONFIG.get("dingtalk_system_alert_secret", ""),
+            url=CONFIG.get("dingtalk_system_alert_url", "https://oapi.dingtalk.com/robot/send?access_token="),
+            name="系统异常告警"
+        ),
+        monitor_alert=DingTalkAlertConfig(
+            enable=CONFIG.get("dingtalk_monitor_alert_enable", False),
+            access_token=CONFIG.get("dingtalk_monitor_alert_token", ""),
+            secret=CONFIG.get("dingtalk_monitor_alert_secret", ""),
+            url=CONFIG.get("dingtalk_monitor_alert_url", "https://oapi.dingtalk.com/robot/send?access_token="),
+            name="系统监控告警"
+        ),
+        task_alert=DingTalkAlertConfig(
+            enable=CONFIG.get("dingtalk_task_alert_enable", False),
+            access_token=CONFIG.get("dingtalk_task_alert_token", ""),
+            secret=CONFIG.get("dingtalk_task_alert_secret", ""),
+            url=CONFIG.get("dingtalk_task_alert_url", "https://oapi.dingtalk.com/robot/send?access_token="),
+            name="任务异常告警"
+        )
+    )
+
+@app.put("/api/settings/dingtalk-config")
+async def update_dingtalk_config(config: DingTalkConfig) -> JSONResponse:
+    """更新钉钉告警配置"""
+    try:
+        # 准备要保存的配置
+        config_to_save = {
+            # 系统异常告警配置
+            "dingtalk_system_alert_enable": config.system_alert.enable,
+            "dingtalk_system_alert_token": config.system_alert.access_token,
+            "dingtalk_system_alert_secret": config.system_alert.secret,
+            "dingtalk_system_alert_url": config.system_alert.url,
+            
+            # 系统监控告警配置
+            "dingtalk_monitor_alert_enable": config.monitor_alert.enable,
+            "dingtalk_monitor_alert_token": config.monitor_alert.access_token,
+            "dingtalk_monitor_alert_secret": config.monitor_alert.secret,
+            "dingtalk_monitor_alert_url": config.monitor_alert.url,
+            
+            # 任务异常告警配置
+            "dingtalk_task_alert_enable": config.task_alert.enable,
+            "dingtalk_task_alert_token": config.task_alert.access_token,
+            "dingtalk_task_alert_secret": config.task_alert.secret,
+            "dingtalk_task_alert_url": config.task_alert.url
+        }
+        
+        # 更新内存中的配置
+        global CONFIG
+        CONFIG.update(config_to_save)
+        
+        # 保存到配置存储系统
+        await update_config(config_to_save)
+        
+        print(f"✅ 钉钉告警配置已保存到存储: {list(config_to_save.keys())}")
+        
+        return JSONResponse({"message": "钉钉告警配置更新成功"})
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"更新钉钉告警配置失败: {str(e)}")
+
+@app.post("/api/settings/dingtalk-test")
+async def test_dingtalk_connection() -> JSONResponse:
+    """测试钉钉连接"""
+    try:
+        # 检查是否有任何告警配置启用
+        has_enabled_alert = (
+            CONFIG.get("dingtalk_system_alert_enable", False) or
+            CONFIG.get("dingtalk_monitor_alert_enable", False) or
+            CONFIG.get("dingtalk_task_alert_enable", False)
+        )
+        
+        if not has_enabled_alert:
+            return JSONResponse(
+                {"message": "没有启用任何钉钉告警配置"}, 
+                status_code=400
+            )
+        
+        # 测试所有启用的告警配置
+        test_results = []
+        
+        if CONFIG.get("dingtalk_system_alert_enable", False):
+            try:
+                from services.dingtalk_alert import DingTalkAlert
+                alert = DingTalkAlert(
+                    ding_access_token=CONFIG.get("dingtalk_system_alert_token", ""),
+                    ding_url=CONFIG.get("dingtalk_system_alert_url", "https://oapi.dingtalk.com/robot/send?access_token="),
+                    secret=CONFIG.get("dingtalk_system_alert_secret", "")
+                )
+                success = alert.test_connection()
+                test_results.append(f"系统异常告警: {'成功' if success else '失败'}")
+            except Exception as e:
+                test_results.append(f"系统异常告警: 失败 ({str(e)})")
+        
+        if CONFIG.get("dingtalk_monitor_alert_enable", False):
+            try:
+                from services.dingtalk_alert import DingTalkAlert
+                alert = DingTalkAlert(
+                    ding_access_token=CONFIG.get("dingtalk_monitor_alert_token", ""),
+                    ding_url=CONFIG.get("dingtalk_monitor_alert_url", "https://oapi.dingtalk.com/robot/send?access_token="),
+                    secret=CONFIG.get("dingtalk_monitor_alert_secret", "")
+                )
+                success = alert.test_connection()
+                test_results.append(f"系统监控告警: {'成功' if success else '失败'}")
+            except Exception as e:
+                test_results.append(f"系统监控告警: 失败 ({str(e)})")
+        
+        if CONFIG.get("dingtalk_task_alert_enable", False):
+            try:
+                from services.dingtalk_alert import DingTalkAlert
+                alert = DingTalkAlert(
+                    ding_access_token=CONFIG.get("dingtalk_task_alert_token", ""),
+                    ding_url=CONFIG.get("dingtalk_task_alert_url", "https://oapi.dingtalk.com/robot/send?access_token="),
+                    secret=CONFIG.get("dingtalk_task_alert_secret", "")
+                )
+                success = alert.test_connection()
+                test_results.append(f"任务异常告警: {'成功' if success else '失败'}")
+            except Exception as e:
+                test_results.append(f"任务异常告警: 失败 ({str(e)})")
+        
+        return JSONResponse({
+            "message": "钉钉连接测试完成",
+            "results": test_results
+        })
+        
+    except Exception as e:
+        return JSONResponse(
+            {"message": f"钉钉连接测试失败: {str(e)}"}, 
+            status_code=500
+        )
+
+@app.post("/api/settings/dingtalk-send-test")
+async def send_dingtalk_test_message() -> JSONResponse:
+    """发送钉钉测试消息"""
+    try:
+        # 检查是否有任何告警配置启用
+        has_enabled_alert = (
+            CONFIG.get("dingtalk_system_alert_enable", False) or
+            CONFIG.get("dingtalk_monitor_alert_enable", False) or
+            CONFIG.get("dingtalk_task_alert_enable", False)
+        )
+        
+        if not has_enabled_alert:
+            return JSONResponse(
+                {"message": "没有启用任何钉钉告警配置"}, 
+                status_code=400
+            )
+        
+        # 发送测试消息到所有启用的告警配置
+        send_results = []
+        
+        if CONFIG.get("dingtalk_system_alert_enable", False):
+            try:
+                from services.dingtalk_alert import DingTalkAlert
+                alert = DingTalkAlert(
+                    ding_access_token=CONFIG.get("dingtalk_system_alert_token", ""),
+                    ding_url=CONFIG.get("dingtalk_system_alert_url", "https://oapi.dingtalk.com/robot/send?access_token="),
+                    secret=CONFIG.get("dingtalk_system_alert_secret", "")
+                )
+                result = alert.send_system_alert(
+                    alert_type="系统测试",
+                    details="这是一条系统异常告警测试消息，用于验证钉钉告警功能是否正常工作。"
+                )
+                if result.get("errcode") == 0:
+                    send_results.append("系统异常告警: 发送成功")
+                else:
+                    send_results.append(f"系统异常告警: 发送失败 ({result.get('errmsg', '未知错误')})")
+            except Exception as e:
+                send_results.append(f"系统异常告警: 发送失败 ({str(e)})")
+        
+        if CONFIG.get("dingtalk_monitor_alert_enable", False):
+            try:
+                from services.dingtalk_alert import DingTalkAlert
+                alert = DingTalkAlert(
+                    ding_access_token=CONFIG.get("dingtalk_monitor_alert_token", ""),
+                    ding_url=CONFIG.get("dingtalk_monitor_alert_url", "https://oapi.dingtalk.com/robot/send?access_token="),
+                    secret=CONFIG.get("dingtalk_monitor_alert_secret", "")
+                )
+                result = alert.send_system_alert(
+                    alert_type="系统测试",
+                    details="这是一条系统监控告警测试消息，用于验证钉钉告警功能是否正常工作。"
+                )
+                if result.get("errcode") == 0:
+                    send_results.append("系统监控告警: 发送成功")
+                else:
+                    send_results.append(f"系统监控告警: 发送失败 ({result.get('errmsg', '未知错误')})")
+            except Exception as e:
+                send_results.append(f"系统监控告警: 发送失败 ({str(e)})")
+        
+        if CONFIG.get("dingtalk_task_alert_enable", False):
+            try:
+                from services.dingtalk_alert import DingTalkAlert
+                alert = DingTalkAlert(
+                    ding_access_token=CONFIG.get("dingtalk_task_alert_token", ""),
+                    ding_url=CONFIG.get("dingtalk_task_alert_url", "https://oapi.dingtalk.com/robot/send?access_token="),
+                    secret=CONFIG.get("dingtalk_task_alert_secret", "")
+                )
+                result = alert.send_system_alert(
+                    alert_type="系统测试",
+                    details="这是一条任务异常告警测试消息，用于验证钉钉告警功能是否正常工作。"
+                )
+                if result.get("errcode") == 0:
+                    send_results.append("任务异常告警: 发送成功")
+                else:
+                    send_results.append(f"任务异常告警: 发送失败 ({result.get('errmsg', '未知错误')})")
+            except Exception as e:
+                send_results.append(f"任务异常告警: 发送失败 ({str(e)})")
+        
+        return JSONResponse({
+            "message": "钉钉测试消息发送完成",
+            "results": send_results
+        })
+        
+    except Exception as e:
+        return JSONResponse(
+            {"message": f"发送钉钉测试消息失败: {str(e)}"}, 
+            status_code=500
+        )
+
+# ==================== 系统监控 API ====================
+
+@app.get("/api/settings/system-monitor-config")
+async def get_system_monitor_config() -> SystemMonitorConfig:
+    """获取系统监控配置"""
+    return SystemMonitorConfig(
+        enable_system_monitor=CONFIG["enable_system_monitor"],
+        cpu_threshold=CONFIG["cpu_threshold"],
+        memory_threshold=CONFIG["memory_threshold"],
+        disk_threshold=CONFIG["disk_threshold"],
+        monitor_check_interval=CONFIG["monitor_check_interval"]
+    )
+
+@app.put("/api/settings/system-monitor-config")
+async def update_system_monitor_config(config: SystemMonitorConfig) -> JSONResponse:
+    """更新系统监控配置"""
+    global system_monitor
+    
+    try:
+        # 准备要保存的配置
+        config_to_save = {
+            "enable_system_monitor": config.enable_system_monitor,
+            "cpu_threshold": config.cpu_threshold,
+            "memory_threshold": config.memory_threshold,
+            "disk_threshold": config.disk_threshold,
+            "monitor_check_interval": config.monitor_check_interval
+        }
+        
+        # 更新内存中的配置
+        global CONFIG
+        CONFIG.update(config_to_save)
+        
+        # 保存到配置存储系统
+        await update_config(config_to_save)
+        
+        print(f"✅ 系统监控配置已保存到存储: {list(config_to_save.keys())}")
+        
+        # 重新初始化系统监控
+        if config.enable_system_monitor:
+            try:
+                from services.system_monitor import SystemMonitor
+                if system_monitor:
+                    await system_monitor.stop()
+                
+                system_monitor = SystemMonitor(dingtalk_alert)
+                system_monitor.update_thresholds({
+                    "cpu_usage": config.cpu_threshold,
+                    "memory_usage": config.memory_threshold,
+                    "disk_usage": config.disk_threshold,
+                    "check_interval": config.monitor_check_interval
+                })
+                await system_monitor.start()
+                return JSONResponse({"message": "系统监控配置更新成功"})
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"系统监控初始化失败: {str(e)}")
+        else:
+            if system_monitor:
+                await system_monitor.stop()
+                system_monitor = None
+            return JSONResponse({"message": "系统监控已禁用"})
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"更新系统监控配置失败: {str(e)}")
+
+@app.get("/api/settings/system-monitor-metrics")
+async def get_system_monitor_metrics() -> Dict[str, Any]:
+    """获取系统监控指标"""
+    global system_monitor
+    
+    try:
+        # 如果系统监控未启用，返回基本指标
+        if not CONFIG.get("enable_system_monitor", False):
+            # 获取基本系统指标作为fallback
+            import psutil
+            import time
+            
+            # CPU使用率
+            cpu_usage = psutil.cpu_percent(interval=1)
+            
+            # 内存使用率
+            memory = psutil.virtual_memory()
+            memory_usage = memory.percent
+            
+            # 磁盘使用率
+            try:
+                disk = psutil.disk_usage('/')
+                disk_usage = (disk.used / disk.total) * 100
+            except:
+                disk_usage = 0.0
+            
+            return {
+                "cpu_usage": cpu_usage,
+                "memory_usage": memory_usage,
+                "disk_usage": disk_usage,
+                "timestamp": time.time(),
+                "thresholds": {
+                    "cpu_usage": CONFIG.get("cpu_threshold", 89.0),
+                    "memory_usage": CONFIG.get("memory_threshold", 90.0),
+                    "disk_usage": CONFIG.get("disk_threshold", 90.0)
+                },
+                "alert_status": {
+                    "cpu_alerted": False,
+                    "memory_alerted": False,
+                    "disk_alerted": False
+                },
+                "monitor_enabled": False,
+                "message": "系统监控未启用，显示基本指标"
+            }
+        
+        # 如果系统监控已启用但实例不存在，尝试重新初始化
+        if not system_monitor:
+            try:
+                from services.system_monitor import SystemMonitor
+                
+                # 获取系统监控钉钉告警实例
+                monitor_dingtalk_alert = None
+                if CONFIG.get("dingtalk_monitor_alert_enable", False) and CONFIG.get("dingtalk_monitor_alert_token"):
+                    from services.dingtalk_alert import DingTalkAlert
+                    monitor_dingtalk_alert = DingTalkAlert(
+                        ding_access_token=CONFIG["dingtalk_monitor_alert_token"],
+                        ding_url=CONFIG.get("dingtalk_monitor_alert_url", "https://oapi.dingtalk.com/robot/send?access_token="),
+                        secret=CONFIG.get("dingtalk_monitor_alert_secret", "")
+                    )
+                
+                # 创建系统监控实例
+                system_monitor = SystemMonitor(monitor_dingtalk_alert)
+                
+                # 设置监控阈值
+                system_monitor.update_thresholds({
+                    "cpu_usage": CONFIG.get("cpu_threshold", 89.0),
+                    "memory_usage": CONFIG.get("memory_threshold", 90.0),
+                    "disk_usage": CONFIG.get("disk_threshold", 90.0),
+                    "check_interval": CONFIG.get("monitor_check_interval", 60)
+                })
+                
+                print("✅ 系统监控实例已重新初始化")
+            except Exception as e:
+                print(f"❌ 重新初始化系统监控失败: {e}")
+                # 如果重新初始化失败，返回基本指标
+                import psutil
+                import time
+                
+                cpu_usage = psutil.cpu_percent(interval=1)
+                memory = psutil.virtual_memory()
+                memory_usage = memory.percent
+                
+                try:
+                    disk = psutil.disk_usage('/')
+                    disk_usage = (disk.used / disk.total) * 100
+                except:
+                    disk_usage = 0.0
+                
+                return {
+                    "cpu_usage": cpu_usage,
+                    "memory_usage": memory_usage,
+                    "disk_usage": disk_usage,
+                    "timestamp": time.time(),
+                    "thresholds": {
+                        "cpu_usage": CONFIG.get("cpu_threshold", 89.0),
+                        "memory_usage": CONFIG.get("memory_threshold", 90.0),
+                        "disk_usage": CONFIG.get("disk_threshold", 90.0)
+                    },
+                    "alert_status": {
+                        "cpu_alerted": False,
+                        "memory_alerted": False,
+                        "disk_alerted": False
+                    },
+                    "monitor_enabled": False,
+                    "message": f"系统监控初始化失败: {str(e)}"
+                }
+        
+        # 获取系统监控指标
+        metrics = system_monitor.get_current_metrics()
+        metrics["monitor_enabled"] = True
+        metrics["message"] = "系统监控正常运行"
+        
+        return metrics
+        
+    except Exception as e:
+        print(f"❌ 获取系统监控指标失败: {e}")
+        # 返回错误信息但包含基本指标
+        import psutil
+        import time
+        
+        try:
+            cpu_usage = psutil.cpu_percent(interval=1)
+            memory = psutil.virtual_memory()
+            memory_usage = memory.percent
+            
+            try:
+                disk = psutil.disk_usage('/')
+                disk_usage = (disk.used / disk.total) * 100
+            except:
+                disk_usage = 0.0
+        except:
+            cpu_usage = 0.0
+            memory_usage = 0.0
+            disk_usage = 0.0
+        
+        return {
+            "cpu_usage": cpu_usage,
+            "memory_usage": memory_usage,
+            "disk_usage": disk_usage,
+            "timestamp": time.time(),
+            "thresholds": {
+                "cpu_usage": CONFIG.get("cpu_threshold", 89.0),
+                "memory_usage": CONFIG.get("memory_threshold", 90.0),
+                "disk_usage": CONFIG.get("disk_threshold", 90.0)
+            },
+            "alert_status": {
+                "cpu_alerted": False,
+                "memory_alerted": False,
+                "disk_alerted": False
+            },
+            "monitor_enabled": False,
+            "message": f"获取系统监控指标失败: {str(e)}"
+        }
+
+@app.post("/api/settings/system-monitor-test")
+async def test_system_monitor() -> JSONResponse:
+    """测试系统监控告警"""
+    try:
+        # 检查系统监控是否启用
+        if not CONFIG.get("enable_system_monitor", False):
+            return JSONResponse(
+                {"message": "系统监控未启用，无法进行测试"}, 
+                status_code=400
+            )
+        
+        # 检查系统监控钉钉告警是否启用
+        if not CONFIG.get("dingtalk_monitor_alert_enable", False):
+            return JSONResponse(
+                {"message": "系统监控钉钉告警未启用，无法发送测试消息"}, 
+                status_code=400
+            )
+        
+        # 检查钉钉告警配置是否完整
+        if not CONFIG.get("dingtalk_monitor_alert_token"):
+            return JSONResponse(
+                {"message": "系统监控钉钉告警配置不完整，缺少访问令牌"}, 
+                status_code=400
+            )
+        
+        # 创建钉钉告警实例并发送测试消息
+        try:
+            from services.dingtalk_alert import DingTalkAlert
+            monitor_alert = DingTalkAlert(
+                ding_access_token=CONFIG["dingtalk_monitor_alert_token"],
+                ding_url=CONFIG.get("dingtalk_monitor_alert_url", "https://oapi.dingtalk.com/robot/send?access_token="),
+                secret=CONFIG.get("dingtalk_monitor_alert_secret", "")
+            )
+            
+            result = monitor_alert.send_system_alert(
+                "系统监控测试",
+                "这是一条系统监控测试消息，用于验证监控告警功能是否正常工作。"
+            )
+            
+            if result.get("errcode") == 0:
+                return JSONResponse({"message": "系统监控测试告警发送成功"})
+            else:
+                return JSONResponse(
+                    {"message": f"系统监控测试告警发送失败: {result.get('errmsg', '未知错误')}"}, 
+                    status_code=400
+                )
+        except Exception as e:
+            return JSONResponse(
+                {"message": f"发送钉钉告警失败: {str(e)}"}, 
+                status_code=500
+            )
+            
+    except Exception as e:
+        return JSONResponse(
+            {"message": f"发送系统监控测试告警失败: {str(e)}"}, 
+            status_code=500
+        )
 
 @app.get("/api/download")
 async def download_file(filepath: str):
