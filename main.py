@@ -58,11 +58,12 @@ DEFAULT_CONFIG = {
     "dingtalk_access_token": os.getenv("DINGTALK_ACCESS_TOKEN", ""),
     "dingtalk_url": os.getenv("DINGTALK_URL", "https://oapi.dingtalk.com/robot/send?access_token="),
     # 系统监控配置
-    "enable_system_monitor": os.getenv("ENABLE_SYSTEM_MONITOR", "false").lower() == "true",
-    "cpu_threshold": float(os.getenv("CPU_THRESHOLD", "89.0")),
-    "memory_threshold": float(os.getenv("MEMORY_THRESHOLD", "90.0")),
-    "disk_threshold": float(os.getenv("DISK_THRESHOLD", "90.0")),
-    "monitor_check_interval": int(os.getenv("MONITOR_CHECK_INTERVAL", "60"))
+                 "enable_system_monitor": os.getenv("ENABLE_SYSTEM_MONITOR", "false").lower() == "true",
+             "cpu_threshold": float(os.getenv("CPU_THRESHOLD", "89.0")),
+             "memory_threshold": float(os.getenv("MEMORY_THRESHOLD", "90.0")),
+             "disk_threshold": float(os.getenv("DISK_THRESHOLD", "90.0")),
+             "monitor_check_interval": int(os.getenv("MONITOR_CHECK_INTERVAL", "60")),
+             "alert_cooldown_interval": int(os.getenv("ALERT_COOLDOWN_INTERVAL", "300"))
 }
 
 # 全局配置变量
@@ -2024,7 +2025,8 @@ async def get_system_config() -> Dict[str, Any]:
                 "cpu_threshold": all_config.get("cpu_threshold", 89.0),
                 "memory_threshold": all_config.get("memory_threshold", 90.0),
                 "disk_threshold": all_config.get("disk_threshold", 90.0),
-                "monitor_check_interval": all_config.get("monitor_check_interval", 60)
+                "monitor_check_interval": all_config.get("monitor_check_interval", 60),
+                "alert_cooldown_interval": all_config.get("alert_cooldown_interval", 300)
             }
         }
         return config
@@ -2711,6 +2713,7 @@ class SystemMonitorConfig(BaseModel):
     memory_threshold: float = Field(90.0, ge=0, le=100, description="内存使用率阈值")
     disk_threshold: float = Field(90.0, ge=0, le=100, description="磁盘使用率阈值")
     monitor_check_interval: int = Field(60, ge=10, le=3600, description="监控检查间隔（秒）")
+    alert_cooldown_interval: int = Field(300, ge=60, le=3600, description="告警冷却间隔（秒）")
 
 # ==================== Git 仓库管理 API ====================
 
@@ -3044,7 +3047,8 @@ async def get_system_monitor_config() -> SystemMonitorConfig:
         cpu_threshold=CONFIG["cpu_threshold"],
         memory_threshold=CONFIG["memory_threshold"],
         disk_threshold=CONFIG["disk_threshold"],
-        monitor_check_interval=CONFIG["monitor_check_interval"]
+        monitor_check_interval=CONFIG["monitor_check_interval"],
+        alert_cooldown_interval=CONFIG.get("alert_cooldown_interval", 300)
     )
 
 @app.put("/api/settings/system-monitor-config")
@@ -3059,7 +3063,8 @@ async def update_system_monitor_config(config: SystemMonitorConfig) -> JSONRespo
             "cpu_threshold": config.cpu_threshold,
             "memory_threshold": config.memory_threshold,
             "disk_threshold": config.disk_threshold,
-            "monitor_check_interval": config.monitor_check_interval
+            "monitor_check_interval": config.monitor_check_interval,
+            "alert_cooldown_interval": config.alert_cooldown_interval
         }
         
         # 更新内存中的配置
@@ -3083,7 +3088,8 @@ async def update_system_monitor_config(config: SystemMonitorConfig) -> JSONRespo
                     "cpu_usage": config.cpu_threshold,
                     "memory_usage": config.memory_threshold,
                     "disk_usage": config.disk_threshold,
-                    "check_interval": config.monitor_check_interval
+                    "check_interval": config.monitor_check_interval,
+                    "alert_cooldown_interval": config.alert_cooldown_interval
                 })
                 await system_monitor.start()
                 return JSONResponse({"message": "系统监控配置更新成功"})

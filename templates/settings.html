@@ -302,6 +302,11 @@
           <input type="number" id="disk-threshold" min="0" max="100" step="0.1" value="90.0"
             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
         </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">告警冷却间隔 (秒)</label>
+          <input type="number" id="alert-cooldown-interval" min="60" max="3600" step="10" value="300"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+        </div>
       </div>
       <div class="mt-4">
         <div class="flex gap-2">
@@ -325,6 +330,7 @@
         <p>• CPU使用率阈值：当CPU使用率超过设定值时发送告警</p>
         <p>• 内存使用率阈值：当内存使用率超过设定值时发送告警</p>
         <p>• 磁盘使用率阈值：当磁盘使用率超过设定值时发送告警</p>
+        <p>• 告警冷却间隔：连续告警之间的最小间隔时间，避免频繁告警</p>
         <p>• 测试监控：发送一条测试告警消息验证监控功能</p>
         <p>• 查看指标：获取当前系统资源使用情况</p>
       </div>
@@ -1002,6 +1008,7 @@
         document.getElementById('cpu-threshold').value = config.cpu_threshold;
         document.getElementById('memory-threshold').value = config.memory_threshold;
         document.getElementById('disk-threshold').value = config.disk_threshold;
+        document.getElementById('alert-cooldown-interval').value = config.alert_cooldown_interval || 300;
       }
     } catch (error) {
       console.error('加载系统监控配置失败:', error);
@@ -1014,11 +1021,17 @@
     const cpuThreshold = parseFloat(document.getElementById('cpu-threshold').value);
     const memoryThreshold = parseFloat(document.getElementById('memory-threshold').value);
     const diskThreshold = parseFloat(document.getElementById('disk-threshold').value);
+    const alertCooldownInterval = parseInt(document.getElementById('alert-cooldown-interval').value);
     
     if (enableMonitor && (cpuThreshold < 0 || cpuThreshold > 100 || 
                          memoryThreshold < 0 || memoryThreshold > 100 || 
                          diskThreshold < 0 || diskThreshold > 100)) {
       showToast('阈值设置必须在0-100之间', 'error');
+      return;
+    }
+
+    if (alertCooldownInterval < 60 || alertCooldownInterval > 3600) {
+      showToast('告警冷却间隔必须在60-3600秒之间', 'error');
       return;
     }
 
@@ -1033,7 +1046,8 @@
           cpu_threshold: cpuThreshold,
           memory_threshold: memoryThreshold,
           disk_threshold: diskThreshold,
-          monitor_check_interval: 60
+          monitor_check_interval: 60,
+          alert_cooldown_interval: alertCooldownInterval
         })
       });
 

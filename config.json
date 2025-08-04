@@ -27,5 +27,6 @@
   "dingtalk_task_alert_enable": false,
   "dingtalk_task_alert_token": "",
   "dingtalk_task_alert_secret": "",
-  "dingtalk_task_alert_url": "https://oapi.dingtalk.com/robot/send?access_token="
+  "dingtalk_task_alert_url": "https://oapi.dingtalk.com/robot/send?access_token=",
+  "alert_cooldown_interval": 60
 }

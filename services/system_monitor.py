@@ -50,6 +50,12 @@ class SystemMonitor:
     def update_thresholds(self, thresholds: Dict[str, float]):
         """更新监控阈值"""
         self.thresholds.update(thresholds)
+        
+        # 如果配置中包含告警冷却间隔，则更新
+        if "alert_cooldown_interval" in thresholds:
+            self.alert_cooldown = thresholds["alert_cooldown_interval"]
+            print(f"⏰ 告警冷却间隔已更新: {self.alert_cooldown}秒")
+        
         print(f"📊 监控阈值已更新: {thresholds}")
     
     async def _monitor_loop(self):
@@ -167,6 +173,13 @@ class SystemMonitor:
         """重置告警状态（冷却时间后）"""
         await asyncio.sleep(self.alert_cooldown)
         self.alert_status[alert_type] = False
+        print(f"⏰ 告警冷却期结束，状态已重置: {alert_type}")
+        
+        # 冷却期结束后立即进行一次检查
+        try:
+            await self._check_system_metrics()
+        except Exception as e:
+            print(f"❌ 冷却期后检查失败: {e}")
     
     def _get_load_average(self) -> str:
         """获取系统负载"""
