@@ -681,7 +681,7 @@
                 ${(task.status === 'FAILED' || task.status === 'EXCEPTION') ? 
                   `<button onclick="showErrorDetail(this)" 
                     data-task-id="${task.id}"
-                    data-error-detail="${task.error_detail || ''}"
+                    data-error-detail="${(task.error_detail || '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}"
                     data-error-timestamp="${task.error_timestamp || ''}"
                     class="px-3 py-1.5 text-xs font-medium bg-orange-50 text-orange-700 border border-orange-200 rounded-md hover:bg-orange-100 transition-colors">
                     详情
@@ -993,9 +993,17 @@
       errorDetail = element.dataset.errorDetail;
       errorTimestamp = element.dataset.errorTimestamp;
     }
+    
+    // 解码 HTML 实体
+    const decodeHtml = (html) => {
+      const txt = document.createElement('textarea');
+      txt.innerHTML = html;
+      return txt.value;
+    };
+    
     document.getElementById('error-task-id').textContent = taskId;
     document.getElementById('error-timestamp').textContent = errorTimestamp || '未知时间';
-    document.getElementById('error-detail-content').textContent = errorDetail;
+    document.getElementById('error-detail-content').textContent = decodeHtml(errorDetail || '');
     document.getElementById('error-detail-modal').classList.remove('hidden');
   }
 

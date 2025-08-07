@@ -10,10 +10,18 @@ import time
 import os
 import sys
 import threading
+import platform
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Callable
 from task_store.base import TaskStore
 from .log_manager import get_log_manager
+
+# Windows 兼容性检查
+if platform.system() == "Windows":
+    # 确保使用 ProactorEventLoop
+    if not isinstance(asyncio.get_event_loop_policy(), asyncio.WindowsProactorEventLoopPolicy):
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+        print("✅ TaskService: Windows 兼容性已设置 ProactorEventLoop")
 
 
 class TaskService:
