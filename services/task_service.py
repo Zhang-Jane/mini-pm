@@ -18,10 +18,22 @@ from .log_manager import get_log_manager
 
 # Windows 兼容性检查
 if platform.system() == "Windows":
-    # 确保使用 ProactorEventLoop
-    if not isinstance(asyncio.get_event_loop_policy(), asyncio.WindowsProactorEventLoopPolicy):
-        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-        print("✅ TaskService: Windows 兼容性已设置 ProactorEventLoop")
+    try:
+        # 确保使用 ProactorEventLoop
+        current_policy = asyncio.get_event_loop_policy()
+        if not isinstance(current_policy, asyncio.WindowsProactorEventLoopPolicy):
+            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+            print("✅ TaskService: Windows 兼容性已设置 ProactorEventLoop")
+        else:
+            print("✅ TaskService: Windows 兼容性已正确设置")
+    except Exception as e:
+        print(f"⚠️ TaskService Windows 兼容性设置失败: {e}")
+        try:
+            # 强制设置
+            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+            print("✅ TaskService: 强制设置 Windows 兼容性成功")
+        except Exception as e2:
+            print(f"❌ TaskService Windows 兼容性设置完全失败: {e2}")
 
 
 class TaskService:

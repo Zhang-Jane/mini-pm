@@ -17,9 +17,19 @@ from contextlib import asynccontextmanager
 
 # Windows 兼容性：使用 ProactorEventLoop
 if platform.system() == "Windows":
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-    # 确保事件循环策略在导入其他模块前设置
-    print("✅ Windows 兼容性：已设置 ProactorEventLoop")
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+        # 确保事件循环策略在导入其他模块前设置
+        print("✅ Windows 兼容性：已设置 ProactorEventLoop")
+    except Exception as e:
+        print(f"⚠️ Windows 兼容性设置失败: {e}")
+        # 尝试强制设置
+        try:
+            import asyncio.windows_events
+            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+            print("✅ Windows 兼容性：强制设置 ProactorEventLoop 成功")
+        except Exception as e2:
+            print(f"❌ Windows 兼容性设置完全失败: {e2}")
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, Form
 from fastapi.staticfiles import StaticFiles
