@@ -81,6 +81,7 @@ task_status: Dict[str, Dict[str, Any]] = {}
 websocket_connections: List[WebSocket] = []
 dingtalk_alert: Optional['DingTalkAlert'] = None
 system_monitor: Optional['SystemMonitor'] = None
+active_terminals: Dict[str, Dict[str, Any]] = {}
 
 # 广播日志函数 - 异步优化版本
 async def _broadcast_log(message: str):
@@ -819,37 +820,39 @@ active_terminals = {}
 
 @app.websocket("/ws/terminal/{session_id}")
 async def websocket_terminal(websocket: WebSocket, session_id: str):
-    """WebSocket终端连接"""
+    """WebSocket终端连接 - 跨平台兼容版本"""
     await websocket.accept()
     
     try:
-        # 创建新的终端会话
-        import pty
         import os
-        import select
         import threading
         import queue
         import time
-        
-        # 创建伪终端
-        master, slave = pty.openpty()
-        
-        # 启动shell进程
-        import subprocess
         import platform
+        import json
         
         system = platform.system()
+        process = None
+        master = None
+        slave = None
+        data_queue = queue.Queue()
+        
+        # 跨平台兼容性处理
         if system == "Windows":
-            # Windows使用PowerShell或cmd
+            # Windows系统使用subprocess直接创建进程
+            import subprocess
             import shutil
+            
+            # 创建PowerShell或cmd进程
             if shutil.which("powershell.exe"):
-                # 使用PowerShell，支持更好的ANSI和UTF-8
                 process = subprocess.Popen(
                     ["powershell.exe", "-NoLogo", "-Command", "-"],
-                    stdin=slave,
-                    stdout=slave,
-                    stderr=slave,
-                    start_new_session=True,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    universal_newlines=True,
                     env={
                         **os.environ,
                         "TERM": "xterm-256color",
@@ -858,99 +861,96 @@ async def websocket_terminal(websocket: WebSocket, session_id: str):
                     }
                 )
             else:
-                # 回退到cmd
                 process = subprocess.Popen(
                     ["cmd.exe"],
-                    stdin=slave,
-                    stdout=slave,
-                    stderr=slave,
-                    start_new_session=True,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    universal_newlines=True,
                     env={
                         **os.environ,
                         "TERM": "xterm-256color"
                     }
                 )
+            
+            # Windows系统使用subprocess直接读取
+            def read_from_process():
+                try:
+                    while process.poll() is None:
+                        output = process.stdout.readline()
+                        if output:
+                            cleaned_output = clean_pty_output(output)
+                            data_queue.put(cleaned_output)
+                        time.sleep(0.01)
+                except Exception as e:
+                    print(f"Windows进程读取错误: {e}")
+            
+            read_thread = threading.Thread(target=read_from_process, daemon=True)
+            read_thread.start()
+            
         else:
-            # Linux/Unix系统
-            import shutil
-            shell_path = None
-            
-            # 检测系统类型和可用shell
-            if system == "Darwin":  # macOS
-                # 优先使用zsh（macOS默认）
-                if shutil.which("zsh"):
-                    shell_path = "zsh"
-                elif shutil.which("bash"):
-                    shell_path = "bash"
-                else:
-                    shell_path = "/bin/sh"
-            else:  # Linux
-                # 优先使用bash（Linux默认）
-                if shutil.which("bash"):
-                    shell_path = "bash"
-                elif shutil.which("zsh"):
-                    shell_path = "zsh"
-                else:
-                    shell_path = "/bin/sh"
-            
-            # 根据系统设置不同的环境变量
-            env = os.environ.copy()
-            env.update({
-                "TERM": "xterm-256color",
-                "LANG": "en_US.UTF-8",
-                "LC_ALL": "en_US.UTF-8",
-                "LC_CTYPE": "en_US.UTF-8",
-                "LC_MESSAGES": "en_US.UTF-8",
-                "LC_MONETARY": "en_US.UTF-8",
-                "LC_NUMERIC": "en_US.UTF-8",
-                "LC_TIME": "en_US.UTF-8",
-                "LC_COLLATE": "en_US.UTF-8",
-            })
-            
-            # 根据shell类型设置特定环境变量
-            if shell_path == "zsh":
+            # Unix/Linux/macOS系统使用pty
+            try:
+                import pty
+                import select
+                import subprocess
+                import shutil
+                
+                # 创建伪终端
+                master, slave = pty.openpty()
+                
+                # 检测系统类型和可用shell
+                shell_path = None
+                if system == "Darwin":  # macOS
+                    if shutil.which("zsh"):
+                        shell_path = "zsh"
+                    elif shutil.which("bash"):
+                        shell_path = "bash"
+                    else:
+                        shell_path = "/bin/sh"
+                else:  # Linux
+                    if shutil.which("bash"):
+                        shell_path = "bash"
+                    elif shutil.which("zsh"):
+                        shell_path = "zsh"
+                    else:
+                        shell_path = "/bin/sh"
+                
+                # 设置环境变量
+                env = os.environ.copy()
                 env.update({
-                    "BASH_ENV": "",
-                    "ENV": "",
-                    "ZDOTDIR": "",
-                    "ZSHRC": "",
-                    "PROMPT": "%n@%m:%1~$ ",
-                    "RPROMPT": "",
-                    "PS1": "%n@%m:%1~$ ",
-                    "PS2": "> ",
-                    "PS3": "? ",
-                    "PS4": "+ "
+                    "TERM": "xterm-256color",
+                    "LANG": "en_US.UTF-8",
+                    "LC_ALL": "en_US.UTF-8",
+                    "LC_CTYPE": "en_US.UTF-8",
+                    "LC_MESSAGES": "en_US.UTF-8",
+                    "LC_MONETARY": "en_US.UTF-8",
+                    "LC_NUMERIC": "en_US.UTF-8",
+                    "LC_TIME": "en_US.UTF-8",
+                    "LC_COLLATE": "en_US.UTF-8",
                 })
-            elif shell_path == "bash":
-                env.update({
-                    "BASH_ENV": "",
-                    "ENV": "",
-                    "PS1": "\\u@\\h:\\w\\$ ",
-                    "PS2": "> ",
-                    "PS3": "? ",
-                    "PS4": "+ "
-                })
-            
-            # 启动shell进程
-            if shell_path == "zsh":
-                process = subprocess.Popen(
-                    [shell_path, "--no-rcs", "--no-globalrcs"],
-                    stdin=slave,
-                    stdout=slave,
-                    stderr=slave,
-                    start_new_session=True,
-                    env=env
-                )
-            elif shell_path == "bash":
-                process = subprocess.Popen(
-                    [shell_path, "--norc", "--noprofile"],
-                    stdin=slave,
-                    stdout=slave,
-                    stderr=slave,
-                    start_new_session=True,
-                    env=env
-                )
-            else:
+                
+                # 根据shell类型设置特定环境变量
+                if shell_path == "zsh":
+                    env.update({
+                        "BASH_ENV": "",
+                        "ENV": "",
+                        "ZDOTDIR": "",
+                        "ZSHRC": "",
+                        "PROMPT": "%n@%m:%1~$ ",
+                        "RPROMPT": "",
+                        "PS1": "%n@%m:%1~$ ",
+                    })
+                elif shell_path == "bash":
+                    env.update({
+                        "BASH_ENV": "",
+                        "ENV": "",
+                        "PS1": "\\u@\\h:\\w$ ",
+                    })
+                
+                # 启动shell进程
                 process = subprocess.Popen(
                     [shell_path],
                     stdin=slave,
@@ -959,6 +959,40 @@ async def websocket_terminal(websocket: WebSocket, session_id: str):
                     start_new_session=True,
                     env=env
                 )
+                
+                # Unix系统使用PTY读取
+                def read_from_pty():
+                    try:
+                        while process.poll() is None:
+                            ready, _, _ = select.select([master], [], [], 0.1)
+                            if ready:
+                                data = os.read(master, 1024)
+                                if data:
+                                    try:
+                                        decoded_data = data.decode('utf-8', errors='replace')
+                                        cleaned_data = clean_pty_output(decoded_data)
+                                        data_queue.put(cleaned_data)
+                                    except Exception as decode_error:
+                                        print(f"解码PTY输出失败: {decode_error}")
+                                        try:
+                                            decoded_data = data.decode('latin-1', errors='replace')
+                                            cleaned_data = clean_pty_output(decoded_data)
+                                            data_queue.put(cleaned_data)
+                                        except:
+                                            pass
+                    except Exception as e:
+                        print(f"PTY读取错误: {e}")
+                
+                read_thread = threading.Thread(target=read_from_pty, daemon=True)
+                read_thread.start()
+                
+            except ImportError as e:
+                # 如果pty不可用，返回错误
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "message": f"终端创建失败: {str(e)}"
+                }))
+                return
         
         # 存储会话信息
         active_terminals[session_id] = {
@@ -977,91 +1011,80 @@ async def websocket_terminal(websocket: WebSocket, session_id: str):
             "system": system
         }))
         
-        # 创建数据队列
-        data_queue = queue.Queue()
-        
-        def read_from_pty():
-            """从伪终端读取数据"""
-            try:
-                while process.poll() is None:
-                    ready, _, _ = select.select([master], [], [], 0.1)
-                    if ready:
-                        data = os.read(master, 1024)
-                        if data:
-                            data_queue.put(data.decode('utf-8', errors='ignore'))
-            except Exception as e:
-                print(f"PTY读取错误: {e}")
-        
-        # 启动读取线程
-        read_thread = threading.Thread(target=read_from_pty, daemon=True)
-        read_thread.start()
-        
-        # 主循环：处理WebSocket消息和PTY输出
+        # 主循环：处理WebSocket消息和进程输出
         while True:
             try:
-                # 检查WebSocket消息
-                try:
-                    message = await asyncio.wait_for(websocket.receive_text(), timeout=0.1)
-                    data = json.loads(message)
-                    
-                    if data.get("type") == "input":
-                        command = data.get("command", "")
-                        if command:
-                            os.write(master, command.encode())
-                            
-                except asyncio.TimeoutError:
-                    pass
-                except Exception as e:
-                    print(f"接收WebSocket消息错误: {e}")
-                    break
-                
-                # 检查PTY输出
+                # 检查进程输出
                 try:
                     while not data_queue.empty():
-                        output = data_queue.get_nowait()
+                        output_data = data_queue.get_nowait()
                         await websocket.send_text(json.dumps({
                             "type": "output",
-                            "data": output
+                            "data": output_data
                         }))
                 except queue.Empty:
                     pass
                 
-                # 检查进程是否还在运行
-                if process.poll() is not None:
+                # 处理WebSocket消息
+                try:
+                    data = await asyncio.wait_for(websocket.receive_text(), timeout=0.1)
+                    message = json.loads(data)
+                    
+                    if message.get("type") == "input":
+                        command = message.get("command", "")
+                        if command and process and process.poll() is None:
+                            try:
+                                processed_command = process_terminal_input(command)
+                                if system == "Windows":
+                                    # Windows系统直接写入进程
+                                    process.stdin.write(processed_command)
+                                    process.stdin.flush()
+                                else:
+                                    # Unix系统写入PTY
+                                    os.write(master, processed_command.encode('utf-8', errors='ignore'))
+                            except Exception as write_error:
+                                print(f"写入进程失败: {write_error}")
+                                
+                except asyncio.TimeoutError:
+                    pass
+                except Exception as e:
+                    print(f"处理WebSocket消息错误: {e}")
                     break
                     
             except Exception as e:
-                print(f"WebSocket终端错误: {e}")
+                print(f"WebSocket循环错误: {e}")
                 break
-                
+        
     except Exception as e:
-        print(f"终端会话创建失败: {e}")
+        print(f"终端会话错误: {e}")
         await websocket.send_text(json.dumps({
             "type": "error",
-            "message": f"终端创建失败: {str(e)}"
+            "message": f"终端会话错误: {str(e)}"
         }))
     finally:
         # 清理资源
         if session_id in active_terminals:
-            session_info = active_terminals[session_id]
-            try:
-                session_info["process"].terminate()
-                session_info["process"].wait(timeout=5)
-            except:
-                session_info["process"].kill()
-            
-            try:
-                os.close(session_info["master"])
-                os.close(session_info["slave"])
-            except:
-                pass
-            
+            terminal_info = active_terminals[session_id]
+            if terminal_info.get("process"):
+                try:
+                    terminal_info["process"].terminate()
+                    terminal_info["process"].wait(timeout=5)
+                except:
+                    try:
+                        terminal_info["process"].kill()
+                    except:
+                        pass
+            if terminal_info.get("master"):
+                try:
+                    os.close(terminal_info["master"])
+                except:
+                    pass
+            if terminal_info.get("slave"):
+                try:
+                    os.close(terminal_info["slave"])
+                except:
+                    pass
             del active_terminals[session_id]
-        
-        try:
-            await websocket.close()
-        except:
-            pass
 
 @app.get("/api/terminal/sessions")
 async def get_terminal_sessions() -> Dict[str, Any]:
