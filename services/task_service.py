@@ -149,11 +149,13 @@ class TaskService:
         self.running_tasks[task_id] = asyncio.create_task(task_coro)
     
     async def _execute_script(self, task_id: str, script_path: str, interpreter: str):
-        """执行脚本"""
-        output_lines: list[str] = []  # 兼容所有异常分支
+        """执行脚本（跨平台实现）"""
+        import queue
+        output_lines: list[str] = []
         script_name = os.path.basename(script_path)
         start_time = datetime.now()
         start_time_str = start_time.strftime('%Y-%m-%d %H:%M:%S')
+        system = platform.system()
         
         # 获取任务配置
         task = await self.task_store.get_task(task_id)
@@ -162,132 +164,129 @@ class TaskService:
             return
 
         try:
-            # 设置环境变量
             env = os.environ.copy()
             env["PYTHONIOENCODING"] = "utf-8"
-            
-            # 确保路径格式正确（Windows 兼容）
             normalized_script_path = os.path.normpath(script_path)
             normalized_interpreter = os.path.normpath(interpreter)
-            
-            # 检查脚本文件是否存在
             if not os.path.exists(normalized_script_path):
                 raise FileNotFoundError(f"脚本文件不存在: {normalized_script_path}")
-            
-            # 检查解释器是否存在
             if not os.path.exists(normalized_interpreter):
                 raise FileNotFoundError(f"Python解释器不存在: {normalized_interpreter}")
 
-            # 创建进程
-            process = await asyncio.create_subprocess_exec(
-                normalized_interpreter, "-X", "utf8", normalized_script_path,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-                env=env
-            )
-
-            # 保存进程ID到任务状态
-            async with self.task_lock:
-                current_status = self.task_status.get(task_id, {})
-                current_status.update({
-                    "status": "RUNNING",
-                    "process_id": process.pid,
-                    "start_time": time.time()
-                })
-                self.task_status[task_id] = current_status
-
-            # 读取输出
-            while True:
-                line = await process.stdout.readline()
-                if not line:
-                    break
-                
-                try:
-                    output_line = line.decode('utf-8').strip()
-                except UnicodeDecodeError:
-                    # 如果 UTF-8 解码失败，尝试其他编码
+            if system == "Windows":
+                # --- Windows: 用线程池方式 ---
+                def run_in_thread() -> tuple[list[str], int]:
+                    proc = subprocess.Popen(
+                        [normalized_interpreter, "-X", "utf8", normalized_script_path],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        env=env,
+                        bufsize=1,
+                        universal_newlines=True
+                    )
+                    lines: list[str] = []
                     try:
-                        output_line = line.decode('gbk').strip()
-                    except UnicodeDecodeError:
-                        output_line = line.decode('latin-1').strip()
-                
-                output_lines.append(output_line)
-                get_log_manager().log(f"输出: {output_line}", "INFO", task_id)
+                        for line in proc.stdout:
+                            lines.append(line.rstrip())
+                            get_log_manager().log(f"输出: {line.rstrip()}", "INFO", task_id)
+                        proc.stdout.close()
+                        proc.wait()
+                    except Exception as e:
+                        get_log_manager().log(f"Windows 任务输出读取异常: {e}", "ERROR", task_id)
+                    return lines, proc.returncode
 
-            # 等待进程完成
-            return_code = await process.wait()
-            end_time = datetime.now()
-            duration = (end_time - start_time).total_seconds()
-            end_time_str = end_time.strftime('%Y-%m-%d %H:%M:%S')
-            
+                # 用 asyncio.to_thread 保持 async 接口
+                lines, return_code = await asyncio.to_thread(run_in_thread)
+                output_lines.extend(lines)
+                end_time = datetime.now()
+                duration = (end_time - start_time).total_seconds()
+                end_time_str = end_time.strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                # --- Linux/macOS: 原生 async ---
+                process = await asyncio.create_subprocess_exec(
+                    normalized_interpreter, "-X", "utf8", normalized_script_path,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.STDOUT,
+                    env=env
+                )
+                async with self.task_lock:
+                    current_status = self.task_status.get(task_id, {})
+                    current_status.update({
+                        "status": "RUNNING",
+                        "process_id": process.pid,
+                        "start_time": time.time()
+                    })
+                    self.task_status[task_id] = current_status
+                while True:
+                    line = await process.stdout.readline()
+                    if not line:
+                        break
+                    try:
+                        output_line = line.decode('utf-8').strip()
+                    except UnicodeDecodeError:
+                        try:
+                            output_line = line.decode('gbk').strip()
+                        except UnicodeDecodeError:
+                            output_line = line.decode('latin-1').strip()
+                    output_lines.append(output_line)
+                    get_log_manager().log(f"输出: {output_line}", "INFO", task_id)
+                return_code = await process.wait()
+                end_time = datetime.now()
+                duration = (end_time - start_time).total_seconds()
+                end_time_str = end_time.strftime('%Y-%m-%d %H:%M:%S')
+
+            # --- 统一后续处理 ---
             if return_code == 0:
-                # 任务成功
                 get_log_manager().log_task_success(task_id, script_path, duration)
                 async with self.task_lock:
                     current_status = self.task_status.get(task_id, {})
                     run_count = current_status.get("run_count", 0) + 1
                     self.task_status[task_id] = {
-                        "status": "SUCCESS", 
+                        "status": "SUCCESS",
                         "last_success": end_time_str,
                         "last_run": time.time(),
                         "duration": f"{duration:.2f}秒",
                         "run_count": run_count,
-                        "output": output_lines[-10:] if output_lines else [],  # 保留最后10行输出
-                        "process_id": None  # 清除进程ID
+                        "output": output_lines[-10:] if output_lines else [],
+                        "process_id": None
                     }
             else:
-                # 任务失败
                 error_msg = f"退出码 {return_code}"
                 error_detail = f"任务执行失败 - 脚本: {script_path}, 退出码: {return_code}"
                 if output_lines:
-                    error_detail += f"\n\n输出内容:\n" + "\n".join(output_lines[-20:])  # 保留最后20行输出
-                
+                    error_detail += f"\n\n输出内容:\n" + "\n".join(output_lines[-20:])
                 get_log_manager().log_task_failure(task_id, script_path, error_msg, return_code)
-                
-                # 发送钉钉告警
                 await self._send_dingtalk_alert("任务执行失败", f"任务 {task_id} 执行失败\n脚本: {script_path}\n退出码: {return_code}\n执行时间: {duration:.2f}秒")
-                
                 async with self.task_lock:
                     current_status = self.task_status.get(task_id, {})
                     run_count = current_status.get("run_count", 0) + 1
                     self.task_status[task_id] = {
-                        "status": "FAILED", 
+                        "status": "FAILED",
                         "last_error": error_msg,
                         "last_run": time.time(),
                         "duration": f"{duration:.2f}秒",
                         "run_count": run_count,
                         "output": output_lines[-10:] if output_lines else [],
                         "error_detail": error_detail,
-                        "error_timestamp": end_time.strftime('%Y-%m-%d %H:%M:%S'),
-                        "process_id": None  # 清除进程ID
+                        "error_timestamp": end_time_str,
+                        "process_id": None
                     }
-
         except Exception as e:
-            # 任务异常
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
-            
-            # 获取完整的异常堆栈信息
             import traceback
             exception_traceback = traceback.format_exc()
             exception_info = f"异常类型: {type(e).__name__}\n异常信息: {str(e)}\n完整堆栈:\n{exception_traceback}"
-            
             error_detail = f"任务执行异常 - 脚本: {script_path}\n{exception_info}"
-            
-            # 如果有输出内容，也包含进去
             if output_lines:
                 error_detail += f"\n\n脚本输出内容:\n" + "\n".join(output_lines[-20:])
-            
             get_log_manager().log_task_exception(task_id, script_path, e)
-            
-            # 发送钉钉告警
             await self._send_dingtalk_alert("任务执行异常", f"任务 {task_id} 执行异常\n脚本: {script_path}\n异常信息: {str(e)}\n执行时间: {duration:.2f}秒")
-            
             async with self.task_lock:
                 current_status = self.task_status.get(task_id, {})
                 run_count = current_status.get("run_count", 0) + 1
                 self.task_status[task_id] = {
-                    "status": "EXCEPTION", 
+                    "status": "EXCEPTION",
                     "last_error": f"{type(e).__name__}: {str(e)}",
                     "last_run": time.time(),
                     "duration": f"{duration:.2f}秒",
@@ -295,14 +294,11 @@ class TaskService:
                     "output": output_lines[-10:] if output_lines else [],
                     "error_detail": error_detail,
                     "error_timestamp": end_time.strftime('%Y-%m-%d %H:%M:%S'),
-                    "process_id": None  # 清除进程ID
+                    "process_id": None
                 }
-
         finally:
-            # 清理运行中的任务
             if task_id in self.running_tasks:
                 del self.running_tasks[task_id]
-            
             await self._broadcast_status()
     
     async def _send_dingtalk_alert(self, alert_type: str, details: str):
