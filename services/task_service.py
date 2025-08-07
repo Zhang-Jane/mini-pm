@@ -144,10 +144,22 @@ class TaskService:
             # 设置环境变量
             env = os.environ.copy()
             env["PYTHONIOENCODING"] = "utf-8"
+            
+            # 确保路径格式正确（Windows 兼容）
+            normalized_script_path = os.path.normpath(script_path)
+            normalized_interpreter = os.path.normpath(interpreter)
+            
+            # 检查脚本文件是否存在
+            if not os.path.exists(normalized_script_path):
+                raise FileNotFoundError(f"脚本文件不存在: {normalized_script_path}")
+            
+            # 检查解释器是否存在
+            if not os.path.exists(normalized_interpreter):
+                raise FileNotFoundError(f"Python解释器不存在: {normalized_interpreter}")
 
             # 创建进程
             process = await asyncio.create_subprocess_exec(
-                interpreter, "-X", "utf8", script_path,
+                normalized_interpreter, "-X", "utf8", normalized_script_path,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
                 env=env
@@ -170,7 +182,15 @@ class TaskService:
                 if not line:
                     break
                 
-                output_line = line.decode('utf-8').strip()
+                try:
+                    output_line = line.decode('utf-8').strip()
+                except UnicodeDecodeError:
+                    # 如果 UTF-8 解码失败，尝试其他编码
+                    try:
+                        output_line = line.decode('gbk').strip()
+                    except UnicodeDecodeError:
+                        output_line = line.decode('latin-1').strip()
+                
                 output_lines.append(output_line)
                 get_log_manager().log(f"输出: {output_line}", "INFO", task_id)
 
@@ -226,7 +246,18 @@ class TaskService:
             # 任务异常
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
-            error_detail = f"任务执行异常 - 脚本: {script_path}, 异常: {str(e)}"
+            
+            # 获取完整的异常堆栈信息
+            import traceback
+            exception_traceback = traceback.format_exc()
+            exception_info = f"异常类型: {type(e).__name__}\n异常信息: {str(e)}\n完整堆栈:\n{exception_traceback}"
+            
+            error_detail = f"任务执行异常 - 脚本: {script_path}\n{exception_info}"
+            
+            # 如果有输出内容，也包含进去
+            if output_lines:
+                error_detail += f"\n\n脚本输出内容:\n" + "\n".join(output_lines[-20:])
+            
             get_log_manager().log_task_exception(task_id, script_path, e)
             
             # 发送钉钉告警
@@ -237,11 +268,11 @@ class TaskService:
                 run_count = current_status.get("run_count", 0) + 1
                 self.task_status[task_id] = {
                     "status": "EXCEPTION", 
-                    "last_error": str(e),
+                    "last_error": f"{type(e).__name__}: {str(e)}",
                     "last_run": time.time(),
                     "duration": f"{duration:.2f}秒",
                     "run_count": run_count,
-                    "output": [],
+                    "output": output_lines[-10:] if output_lines else [],
                     "error_detail": error_detail,
                     "error_timestamp": end_time.strftime('%Y-%m-%d %H:%M:%S'),
                     "process_id": None  # 清除进程ID
