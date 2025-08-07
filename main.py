@@ -52,7 +52,7 @@ DEFAULT_CONFIG = {
     "export_path": os.getenv("EXPORT_PATH", "./exports"),
     "max_export_size": int(os.getenv("MAX_EXPORT_SIZE", "10485760")),  # 10MB
     "host": os.getenv("HOST", "0.0.0.0"),
-    "port": int(os.getenv("PORT", "8100")),
+    "port": int(os.getenv("PORT", "8121")),
     # 钉钉告警配置
     "enable_dingtalk_alert": os.getenv("ENABLE_DINGTALK_ALERT", "false").lower() == "true",
     "dingtalk_access_token": os.getenv("DINGTALK_ACCESS_TOKEN", ""),
