@@ -15,6 +15,10 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 from contextlib import asynccontextmanager
 
+# Windows 兼容性：使用 ProactorEventLoop
+if platform.system() == "Windows":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates

@@ -678,8 +678,8 @@
                     停止
                   </button>` : ''
                 }
-                ${(task.status === 'FAILED' || task.status === 'EXCEPTION') && task.error_detail ? 
-                  `<button                   onclick="showErrorDetail(this)" 
+                ${(task.status === 'FAILED' || task.status === 'EXCEPTION') ? 
+                  `<button onclick="showErrorDetail(this)" 
                     data-task-id="${task.id}"
                     data-error-detail="${task.error_detail || ''}"
                     data-error-timestamp="${task.error_timestamp || ''}"
