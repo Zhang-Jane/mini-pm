@@ -182,14 +182,22 @@ class TaskService:
                         stderr=subprocess.STDOUT,
                         env=env,
                         bufsize=1,
-                        universal_newlines=True
+                        universal_newlines=False  # 关闭自动解码，手动处理
                     )
                     lines: list[str] = []
                     code: int = -1
                     try:
                         for line in proc.stdout:
-                            lines.append(line.rstrip())
-                            get_log_manager().log(f"输出: {line.rstrip()}", "INFO", task_id)
+                            # line: bytes
+                            try:
+                                output_line = line.decode('utf-8').rstrip()
+                            except UnicodeDecodeError:
+                                try:
+                                    output_line = line.decode('gbk').rstrip()
+                                except UnicodeDecodeError:
+                                    output_line = line.decode('latin-1').rstrip()
+                            lines.append(output_line)
+                            get_log_manager().log(f"输出: {output_line}", "INFO", task_id)
                         proc.stdout.close()
                         proc.wait()  # 等待进程结束
                     except Exception as e:
