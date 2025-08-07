@@ -943,7 +943,7 @@ async def websocket_terminal(websocket: WebSocket, session_id: str):
             # 创建PowerShell或cmd进程
             if shutil.which("powershell.exe"):
                 process = subprocess.Popen(
-                    ["powershell.exe", "-NoLogo", "-Interactive"],
+                    ["powershell.exe", "-NoLogo"],
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
@@ -994,13 +994,15 @@ async def websocket_terminal(websocket: WebSocket, session_id: str):
                             initial_commands = [
                                 "Write-Host 'Windows PowerShell Terminal Ready' -ForegroundColor Green\n",
                                 "Write-Host ('Current Directory: ' + (Get-Location).Path) -ForegroundColor Yellow\n",
-                                "Write-Host 'Type Get-Help for available commands' -ForegroundColor Cyan\n"
+                                "Write-Host 'Type Get-Help for available commands' -ForegroundColor Cyan\n",
+                                "Write-Host 'PS> ' -NoNewline\n"
                             ]
                         else:
                             initial_commands = [
                                 "echo Windows Command Prompt Ready\n",
                                 "echo Current Directory: %CD%\n",
-                                "echo Type 'help' for available commands\n"
+                                "echo Type 'help' for available commands\n",
+                                "echo.\n"
                             ]
                         for cmd in initial_commands:
                             process.stdin.write(cmd)
