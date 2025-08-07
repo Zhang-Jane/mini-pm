@@ -185,15 +185,22 @@ class TaskService:
                         universal_newlines=True
                     )
                     lines: list[str] = []
+                    code: int = -1
                     try:
                         for line in proc.stdout:
                             lines.append(line.rstrip())
                             get_log_manager().log(f"输出: {line.rstrip()}", "INFO", task_id)
                         proc.stdout.close()
-                        proc.wait()
+                        proc.wait()  # 等待进程结束
                     except Exception as e:
                         get_log_manager().log(f"Windows 任务输出读取异常: {e}", "ERROR", task_id)
-                    return lines, proc.returncode
+                    finally:
+                        try:
+                            proc.wait(timeout=1)
+                        except Exception:
+                            pass
+                        code = proc.returncode if proc.returncode is not None else -1
+                    return lines, code
 
                 # 用 asyncio.to_thread 保持 async 接口
                 lines, return_code = await asyncio.to_thread(run_in_thread)
