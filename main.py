@@ -943,7 +943,7 @@ async def websocket_terminal(websocket: WebSocket, session_id: str):
             # 创建PowerShell或cmd进程
             if shutil.which("powershell.exe"):
                 process = subprocess.Popen(
-                    ["powershell.exe", "-NoLogo", "-Command", "-"],
+                    ["powershell.exe", "-NoLogo", "-Interactive"],
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
@@ -959,7 +959,7 @@ async def websocket_terminal(websocket: WebSocket, session_id: str):
                 )
             else:
                 process = subprocess.Popen(
-                    ["cmd.exe"],
+                    ["cmd.exe", "/K", "echo Windows Command Prompt Ready"],
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
@@ -983,6 +983,35 @@ async def websocket_terminal(websocket: WebSocket, session_id: str):
                         time.sleep(0.01)
                 except Exception as e:
                     print(f"Windows进程读取错误: {e}")
+            
+            # 发送初始命令来设置Windows终端环境
+            def send_initial_commands():
+                try:
+                    time.sleep(0.5)  # 等待进程启动
+                    if process and process.poll() is None:
+                        # 发送初始命令
+                        if shutil.which("powershell.exe"):
+                            initial_commands = [
+                                "Write-Host 'Windows PowerShell Terminal Ready' -ForegroundColor Green\n",
+                                "Write-Host ('Current Directory: ' + (Get-Location).Path) -ForegroundColor Yellow\n",
+                                "Write-Host 'Type Get-Help for available commands' -ForegroundColor Cyan\n"
+                            ]
+                        else:
+                            initial_commands = [
+                                "echo Windows Command Prompt Ready\n",
+                                "echo Current Directory: %CD%\n",
+                                "echo Type 'help' for available commands\n"
+                            ]
+                        for cmd in initial_commands:
+                            process.stdin.write(cmd)
+                            process.stdin.flush()
+                            time.sleep(0.1)
+                except Exception as e:
+                    print(f"发送初始命令失败: {e}")
+            
+            # 启动初始命令线程
+            init_thread = threading.Thread(target=send_initial_commands, daemon=True)
+            init_thread.start()
             
             read_thread = threading.Thread(target=read_from_process, daemon=True)
             read_thread.start()
@@ -1136,6 +1165,14 @@ async def websocket_terminal(websocket: WebSocket, session_id: str):
                                     # Windows系统直接写入进程
                                     process.stdin.write(processed_command)
                                     process.stdin.flush()
+                                    
+                                    # 对于Windows系统，手动回显用户输入
+                                    if command.strip() and not command.startswith('\x1B'):  # 不是控制字符
+                                        echo_data = f"{command}"
+                                        await websocket.send_text(json.dumps({
+                                            "type": "output",
+                                            "data": echo_data
+                                        }))
                                 else:
                                     # Unix系统写入PTY
                                     os.write(master, processed_command.encode('utf-8', errors='ignore'))

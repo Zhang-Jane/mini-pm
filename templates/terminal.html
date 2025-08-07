@@ -65,40 +65,40 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">预设命令</label>
                             <select id="quick-command" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                                <option value="">选择预设命令</option>
-                                <option value="pwd">显示当前目录</option>
-                                <option value="ls -la">列出文件</option>
-                                <option value="ps aux">查看进程</option>
-                                <option value="df -h">磁盘使用情况</option>
-                                <option value="free -h">内存使用情况</option>
-                                <option value="top">系统监控</option>
-                                <option value="whoami">当前用户</option>
-                                <option value="date">当前时间</option>
-                                <option value="uname -a">系统信息</option>
+                    <option value="">选择预设命令</option>
+                    <option value="pwd">显示当前目录</option>
+                    <option value="ls -la">列出文件</option>
+                    <option value="ps aux">查看进程</option>
+                    <option value="df -h">磁盘使用情况</option>
+                    <option value="free -h">内存使用情况</option>
+                    <option value="top">系统监控</option>
+                    <option value="whoami">当前用户</option>
+                    <option value="date">当前时间</option>
+                    <option value="uname -a">系统信息</option>
                                 <option value="systemctl status">服务状态</option>
                                 <option value="netstat -tuln">网络连接</option>
-                            </select>
-                        </div>
+                </select>
+            </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">自定义命令</label>
                             <input type="text" id="custom-command" placeholder="输入命令..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        </div>
+            </div>
                     </div>
                     <div class="flex items-center gap-3">
                         <button id="execute-command" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                            </svg>
-                            执行命令
-                        </button>
+                    </svg>
+                    执行命令
+                </button>
                         <button id="batch-execute" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                             </svg>
                             批量执行
                         </button>
-                    </div>
-                </div>
+            </div>
+        </div>
             </div>
 
             <!-- 文件传输面板 -->
@@ -181,7 +181,7 @@
         <h2 class="text-xl font-semibold text-gray-900 mb-6 flex items-center">
             <svg class="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-            </svg>
+                    </svg>
             文件传输历史
         </h2>
         <div class="overflow-x-auto">
@@ -200,15 +200,15 @@
                     <!-- 文件传输记录将在这里动态生成 -->
                 </tbody>
             </table>
-        </div>
-    </div>
+                </div>
+            </div>
 
     <!-- 终端状态面板 -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h2 class="text-xl font-semibold text-gray-900 mb-6 flex items-center">
             <svg class="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-            </svg>
+                    </svg>
             终端状态
         </h2>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -627,11 +627,11 @@
             // 创建标签页
             this.createTab(terminalId, sessionId);
 
-            // 创建终端实例
-            const terminal = new Terminal({
-                cursorBlink: true,
+                    // 创建终端实例
+        const terminal = new Terminal({
+            cursorBlink: true,
                 ...this.terminalConfig
-            });
+        });
 
             // 创建终端容器
             const terminalContainer = document.createElement('div');
@@ -761,7 +761,7 @@
             const reconnectDelay = 2000;
 
             const initializeTerminal = () => {
-                if (websocket.readyState === WebSocket.OPEN) {
+                    if (websocket.readyState === WebSocket.OPEN) {
                     // 根据系统类型选择初始化命令
                     const system = terminalInfo.system || 'Unknown';
                     let initCommands = [];
@@ -792,10 +792,10 @@
                             'clear'
                         ];
                     }
-
-                    initCommands.forEach((cmd, index) => {
-                        setTimeout(() => {
-                            if (websocket.readyState === WebSocket.OPEN) {
+                        
+                        initCommands.forEach((cmd, index) => {
+                            setTimeout(() => {
+                                if (websocket.readyState === WebSocket.OPEN) {
                                 try {
                                     websocket.send(JSON.stringify({
                                         type: 'input',
@@ -860,10 +860,10 @@
             terminalInfo.terminal.onData((data) => {
                 if (terminalInfo.isConnected && websocket.readyState === WebSocket.OPEN) {
                     try {
-                        websocket.send(JSON.stringify({
-                            type: 'input',
+                    websocket.send(JSON.stringify({
+                        type: 'input',
                             command: data
-                        }));
+                    }));
                     } catch (error) {
                         console.error('发送数据到WebSocket失败:', error);
                         terminalInfo.isConnected = false;
@@ -1519,10 +1519,10 @@
             // 发送命令到终端
             try {
                 if (terminalInfo.websocket && terminalInfo.websocket.readyState === WebSocket.OPEN) {
-                    terminalInfo.websocket.send(JSON.stringify({
-                        type: 'input',
-                        command: command + '\n'
-                    }));
+            terminalInfo.websocket.send(JSON.stringify({
+                type: 'input',
+                command: command + '\n'
+            }));
                 } else {
                     this.showNotification('终端连接已断开', 'error');
                     return;
@@ -1970,8 +1970,8 @@
                     }
                     
                     throw new Error(errorMessage);
-                }
-            } catch (error) {
+                    }
+                } catch (error) {
                 this.hideUploadProgress();
                 console.error('上传文件失败:', error);
                 console.error('错误详情:', error.stack);
