@@ -130,6 +130,7 @@ class TaskService:
     
     async def _execute_script(self, task_id: str, script_path: str, interpreter: str):
         """执行脚本"""
+        output_lines: list[str] = []  # 兼容所有异常分支
         script_name = os.path.basename(script_path)
         start_time = datetime.now()
         start_time_str = start_time.strftime('%Y-%m-%d %H:%M:%S')
@@ -176,7 +177,6 @@ class TaskService:
                 self.task_status[task_id] = current_status
 
             # 读取输出
-            output_lines = []
             while True:
                 line = await process.stdout.readline()
                 if not line:
