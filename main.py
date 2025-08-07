@@ -815,6 +815,103 @@ async def batch_clear_task_history(request: BatchTaskRequest) -> JSONResponse:
 class TerminalCommand(BaseModel):
     command: str = Field(..., description="要执行的命令")
 
+def process_terminal_input(command: str) -> str:
+    """处理终端输入，确保兼容所有键盘"""
+    if not command:
+        return command
+    
+    processed = command
+    
+    # 处理常见的键盘输入问题（删除、退格、回车、Ctrl序列）
+    # 退格键
+    processed = processed.replace('\x08', '\x08')  # 保持退格字符
+    
+    # 删除键 - 确保正确的ANSI序列
+    processed = processed.replace('\x1B[3~', '\x1B[3~')  # 保持删除键序列
+    
+    # 回车键
+    processed = processed.replace('\r\n', '\n')
+    processed = processed.replace('\r', '\n')
+    
+    # Ctrl+U (清空行)
+    processed = processed.replace('\x15', '\x15')
+    
+    # Ctrl+W (删除前一个单词)
+    processed = processed.replace('\x17', '\x17')
+    
+    # Ctrl+K (删除到行尾)
+    processed = processed.replace('\x0B', '\x0B')
+    
+    # Ctrl+A (移动到行首)
+    processed = processed.replace('\x01', '\x01')
+    
+    # Ctrl+E (移动到行尾)
+    processed = processed.replace('\x05', '\x05')
+    
+    # Ctrl+L (清屏)
+    processed = processed.replace('\x0C', '\x0C')
+    
+    # 移除有问题的控制字符
+    processed = processed.replace('\x1B[?2004h', '')  # 移除括号粘贴模式
+    processed = processed.replace('\x1B[?2004l', '')  # 移除括号粘贴模式
+    
+    # 处理某些系统发送的DEL字符
+    processed = processed.replace('\x7F', '\x1B[3~')
+    
+    return processed
+
+def clean_pty_output(output: str) -> str:
+    """清理PTY输出，移除有问题的控制字符但保留用户输入回显"""
+    if not output:
+        return output
+    
+    import re
+    
+    cleaned = output
+    
+    # 移除有问题的ANSI序列，但保留颜色和基本格式化
+    cleaned = re.sub(r'\x1B\[[0-9]*[@ABCDEFGHIJKLMNOPQRSTUVWXYZ]', '', cleaned)
+    cleaned = re.sub(r'\x1B\[[0-9;]*[a-zA-Z]', lambda match: 
+        match.group(0) if match.group(0).endswith(('m', 'h', 'l', 's', 'u')) else '', cleaned)
+    
+    # 移除反向搜索提示符
+    cleaned = re.sub(r'\(reverse-i-search\)`[^`]*`:', '', cleaned)
+    cleaned = re.sub(r'\(forward-i-search\)`[^`]*`:', '', cleaned)
+    
+    # 移除bash提示符中的异常字符，但保留基本提示符
+    cleaned = re.sub(r'bash-[0-9.]+\[[^\]]*\]', 'bash$ ', cleaned)
+    cleaned = re.sub(r'\[[0-9]+@[^\]]*\]', '', cleaned)
+    
+    # 移除光标位置序列
+    cleaned = re.sub(r'\x1B\[[0-9]+;[0-9]+[HR]', '', cleaned)
+    
+    # 移除字符插入/删除序列
+    cleaned = re.sub(r'\x1B\[[0-9]*[P@]', '', cleaned)
+    
+    # 移除字符替换序列
+    cleaned = re.sub(r'\x1B\[[0-9]*[X]', '', cleaned)
+    
+    # 移除字符擦除序列，但保留删除键的回显
+    cleaned = re.sub(r'\x1B\[[0-9]*[K]', '', cleaned)
+    
+    # 处理删除键的回显 - 替换为空格
+    cleaned = cleaned.replace('\x7F', ' ')
+    
+    # 移除行擦除序列
+    cleaned = re.sub(r'\x1B\[[0-9]*[J]', '', cleaned)
+    
+    # 移除光标保存/恢复序列
+    cleaned = re.sub(r'\x1B\[[su]', '', cleaned)
+    
+    # 移除回车符，保留换行符
+    cleaned = cleaned.replace('\r\n', '\n')
+    cleaned = cleaned.replace('\r', '\n')
+    
+    # 移除多余的换行符
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+    
+    return cleaned
+
 # 存储活跃的终端会话
 active_terminals = {}
 
