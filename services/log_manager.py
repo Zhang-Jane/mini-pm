@@ -110,10 +110,14 @@ class LogManager:
         if self.broadcast_callback:
             try:
                 import asyncio
+                import inspect
                 # 格式化WebSocket广播消息，包含日志级别
                 ws_message = f"{timestamp} - [{level.upper()}] {formatted_message}"
-                # 创建异步任务来广播日志
-                asyncio.create_task(self.broadcast_callback(ws_message))
+                # 判断 broadcast_callback 是否为协程函数
+                if inspect.iscoroutinefunction(self.broadcast_callback):
+                    asyncio.create_task(self.broadcast_callback(ws_message))
+                else:
+                    self.broadcast_callback(ws_message)
             except Exception as e:
                 # 如果广播失败，不影响正常日志记录
                 print(f"WebSocket广播失败: {e}")
